@@ -1,0 +1,2164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abyssinia Mega Bingo - Admin Command Center</title>
+<script src="./config.js"></script>
+<script src="./socket.io.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    :root {
+        --primary: #10b981;
+        --primary-dark: #059669;
+        --bg: #070b14;
+        --bg-card: #111827;
+        --bg-sidebar: #0b1120;
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --danger: #ef4444;
+        --success: #10b981;
+        --blue: #3b82f6;
+        --cyan: #06b6d4;
+        --gold: #facc15;
+        --border: #1f2937;
+    }
+    body.light-theme {
+        --bg: #f1f5f9;
+        --bg-card: #ffffff;
+        --bg-sidebar: #e2e8f0;
+        --text: #0f172a;
+        --text-muted: #475569;
+        --border: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; font-weight: 500; }
+    .hidden { display: none !important; }
+
+    /* Login Screen */
+    #login-screen {
+        position: fixed; inset: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 10000;
+        background-image: radial-gradient(circle at 50% 50%, #1e293b 0%, var(--bg) 100%);
+    }
+    .login-box {
+        background: var(--bg-card); padding: 40px 30px; border-radius: 16px; border: 1px solid var(--border); width: 90%; max-width: 400px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+    .login-box h2 { text-align: center; color: var(--gold); margin-bottom: 25px; font-size: 22px; font-weight: 800; display:flex; align-items:center; justify-content:center; gap:10px; }
+    .login-box input {
+        width: 100%; padding: 14px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; margin-bottom: 15px; outline: none; font-weight: bold;
+    }
+    .login-box button {
+        width: 100%; padding: 14px; background: linear-gradient(135deg, var(--gold), #d97706); color: #000; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 15px;
+    }
+    .error-msg { color: var(--danger); text-align: center; margin-bottom: 15px; font-size: 13px; display: none; background: rgba(239,68,68,0.1); padding: 10px; border-radius: 6px; }
+
+    /* Layout */
+    #main-content { flex: 1; display: flex; flex-direction: row; overflow: hidden; display: none; }
+    #sidebar {
+        width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border); flex-shrink: 0; display: flex; flex-direction: column; transition: 0.3s; z-index: 100; overflow-y: auto;
+    }
+    .logo {
+        padding: 20px; font-size: 18px; font-weight: 900; color: var(--gold); display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border);
+    }
+    .menu-group { padding: 15px 0; flex: 1; }
+    .menu-label { padding: 0 20px 8px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; margin-top: 10px; }
+    .menu-item {
+        padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--text-muted); font-size: 13px; font-weight: 700; transition: 0.2s; border-left: 3px solid transparent;
+    }
+    .menu-item:hover, .menu-item.active { background: rgba(250, 204, 21, 0.1); color: var(--gold); border-left-color: var(--gold); }
+    .menu-item i { width: 18px; text-align: center; font-size: 15px; }
+    .notif-badge { background: var(--danger); color: white; border-radius: 10px; padding: 2px 7px; font-size: 10px; margin-left: auto; font-weight: bold; }
+
+    /* Push Notification */
+    #push-notification-container {
+        position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px; pointer-events: none;
+    }
+    .push-notification {
+        background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); color: #fff; padding: 14px; border-radius: 12px; border: 1px solid var(--gold); box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 12px; transform: translateY(-100px); opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: auto; cursor: pointer;
+    }
+    .push-notification.show { transform: translateY(0); opacity: 1; }
+    .push-icon { font-size: 22px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(255,255,255,0.1); }
+    .push-content { flex: 1; }
+    .push-title { font-weight: bold; font-size: 13px; margin-bottom: 2px; }
+    .push-desc { font-size: 12px; color: var(--gold); font-weight: bold; }
+
+    /* Main Panel */
+    .main-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; background: var(--bg); }
+    .top-bar {
+        height: 70px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; padding: 0 25px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .header-title-area h2 { font-size: 20px; font-weight: 800; color: var(--text); }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .admin-profile {
+        display: flex; align-items: center; gap: 8px; background: rgba(250, 204, 21, 0.1); border: 1px solid var(--gold); padding: 6px 14px; border-radius: 20px; cursor: pointer;
+    }
+    .page-container { flex: 1; padding: 20px 25px; overflow-y: auto; }
+    .page { display: none; animation: fadeIn 0.25s ease; }
+    .page.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Stats Cards */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat-box { background: var(--bg-card); padding: 14px 18px; border-radius: 12px; border: 1px solid var(--border); }
+    .stat-box-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 800; margin-bottom: 6px; display: flex; gap: 6px; }
+    .stat-box-value { font-size: 19px; font-weight: 900; color: var(--text); font-family: 'Courier New', monospace; }
+    .stat-box-value.green { color: var(--primary); }
+    .stat-box-value.gold { color: var(--gold); }
+    .stat-box-value.blue { color: var(--blue); }
+    #adm-calls-display { transition: transform 0.2s ease, color 0.2s ease; }
+    .pulse-call { transform: scale(1.15); color: #38bdf8 !important; text-shadow: 0 0 12px rgba(56, 189, 248, 0.8); }
+
+    /* Room Switcher Pills */
+    .admin-room-bar {
+        display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 4px;
+    }
+    .admin-room-btn {
+        padding: 8px 16px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); font-size: 12px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s;
+    }
+    .admin-room-btn.active {
+        background: var(--gold); color: #000; border-color: var(--gold); box-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+    }
+
+    /* Controls & Tables */
+    .filter-section {
+        background: var(--bg-card); padding: 14px 18px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+    }
+    .btn {
+        padding: 9px 16px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; color: #fff; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: var(--blue); }
+    .btn-success { background: var(--success); color: #000; }
+    .btn-danger { background: var(--danger); }
+    .btn-warning { background: var(--gold); color: #000; }
+    .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+    .table-wrapper {
+        background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 16px;
+    }
+    .table-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .table-responsive { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 650px; }
+    th, td { padding: 12px 18px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; }
+    th { background: rgba(0,0,0,0.25); color: var(--text-muted); font-weight: 800; font-size: 11px; text-transform: uppercase; }
+    .user-link { color: var(--blue); font-weight: bold; cursor: pointer; }
+    .form-control {
+        padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-size: 13px; width: 100%; font-weight: bold; outline: none;
+    }
+
+    /* Side Panel */
+    .side-panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; opacity: 0; pointer-events: none; transition: 0.3s; }
+    .side-panel-overlay.active { opacity: 1; pointer-events: auto; }
+    .side-panel {
+        position: fixed; top: 0; right: -450px; width: 100%; max-width: 450px; height: 100vh; background: var(--bg-card); z-index: 10000; transition: 0.3s; display: flex; flex-direction: column; border-left: 1px solid var(--border);
+    }
+    .side-panel.active { right: 0; }
+    .side-panel-header { padding: 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); }
+    .close-panel { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; }
+    .side-panel-body { flex: 1; overflow-y: auto; padding: 18px; }
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: bold; }
+
+    /* Modal */
+    #cards-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10005; display: none; align-items: center; justify-content: center; padding: 20px; }
+    #cards-modal.active { display: flex; }
+    .cards-modal-content { background: var(--bg-card); border-radius: 12px; width: 100%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; }
+    .cards-modal-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .cards-modal-body { padding: 18px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 15px; }
+    .bingo-grid { background: var(--bg); padding: 8px; border-radius: 8px; border: 2px solid var(--border); }
+    .grid-letters { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; margin-bottom: 3px; }
+    .grid-letters div { text-align: center; color: #fff; font-weight: bold; font-size: 12px; border-radius: 4px; padding: 3px 0; }
+    .grid-cells { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+    .grid-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; text-align: center; padding: 6px 0; font-size: 12px; font-weight: bold; color: var(--text); }
+    .grid-cell.free { background: var(--blue); color: #fff; }
+    .grid-cell.marked { background: var(--gold); color: #000; }
+
+    #admin-toast {
+        position: fixed; bottom: 25px; right: 25px; background: var(--primary); color: #000; padding: 12px 20px; border-radius: 8px; font-weight: 800; font-size: 13px; z-index: 99999; opacity: 0; transform: translateY(20px); transition: 0.3s;
+    }
+    #admin-toast.show { opacity: 1; transform: translateY(0); }
+    #admin-toast.error { background: var(--danger); color: #fff; }
+    #mobile-menu-btn { display: none; background: transparent; border: none; color: var(--text); font-size: 18px; cursor: pointer; }
+    @media (max-width: 768px) { #sidebar { position: absolute; left: -260px; height: 100vh; z-index: 100; } #sidebar.active { left: 0; } #mobile-menu-btn { display: block; } .stats-row { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-box">
+        <h2><i class="fas fa-crown"></i> Mega Bingo Admin</h2>
+        <div class="error-msg" id="login-error">Invalid credentials!</div>
+        <input type="text" id="login-username" placeholder="Username">
+        <input type="password" id="login-password" placeholder="Password" onkeypress="if(event.key==='Enter')attemptLogin()">
+        <button id="login-btn" onclick="attemptLogin()">ENTER COMMAND CENTER</button>
+    </div>
+</div>
+
+<div id="admin-toast"></div>
+<div id="push-notification-container"></div>
+
+<div id="main-content">
+    <div id="sidebar">
+        <div class="logo"><i class="fas fa-gem"></i> Mega Admin</div>
+        <div class="menu-group">
+            <div class="menu-label">Game Engine</div>
+            <div class="menu-item active" onclick="switchPage('game', this)"><i class="fas fa-gamepad"></i> Live Command</div>
+            <div class="menu-item" onclick="switchPage('live-players', this)"><i class="fas fa-users"></i> Live Players</div>
+            <div class="menu-item" onclick="switchPage('live-cartelas', this)"><i class="fas fa-th-large"></i> Live Cartelas</div>
+            <div class="menu-item" onclick="switchPage('dashboard', this)"><i class="fas fa-chart-line"></i> Dashboard</div>
+            <div class="menu-item" onclick="switchPage('deposits', this)"><i class="fas fa-arrow-down"></i> Deposits <span id="notif-deposits" class="notif-badge hidden">0</span></div>
+            <div class="menu-item" onclick="switchPage('withdrawals', this)"><i class="fas fa-arrow-up"></i> Withdrawals <span id="notif-withdrawals" class="notif-badge hidden">0</span></div>
+            
+            <div class="menu-label">Management</div>
+            <div class="menu-item" onclick="switchPage('users', this)"><i class="fas fa-address-book"></i> Users Directory</div>
+            <div class="menu-item" onclick="switchPage('bots', this)"><i class="fas fa-robot"></i> Ghost Bots</div>
+            <div class="menu-item" onclick="switchPage('deposit-bonus', this)"><i class="fas fa-percentage"></i> Deposit Bonus %</div>
+            <div class="menu-item" onclick="switchPage('invitation-bonus', this)"><i class="fas fa-gift"></i> Invitation Bonus</div>
+            <div class="menu-item" onclick="switchPage('referrals', this)"><i class="fas fa-network-wired"></i> Referrals</div>
+            <div class="menu-item" onclick="switchPage('promo', this)"><i class="fas fa-tags"></i> Promo Codes</div>
+            <div class="menu-item" onclick="switchPage('broadcast', this)"><i class="fas fa-bullhorn"></i> Broadcast</div>
+            <div class="menu-item" onclick="switchPage('giveaway', this)"><i class="fas fa-gift"></i> Giveaway</div>
+            <div class="menu-item" onclick="switchPage('history', this)"><i class="fas fa-history"></i> Game History</div>
+            <div class="menu-item" onclick="switchPage('settings', this)"><i class="fas fa-cog"></i> Settings</div>
+        </div>
+    </div>
+
+    <div class="main-panel">
+        <div class="top-bar">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <div class="header-title-area">
+                    <h2 id="page-title">Live Command Center</h2>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="admin-profile" onclick="logout()" title="Click to Logout">
+                    <i class="fas fa-crown" style="color:var(--gold);"></i>
+                    <span style="font-weight:bold; font-size:12px; color:var(--gold);">Super Admin</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-container">
+            
+            <!-- ─── 1. Live Game Command Center ─── -->
+            <div id="page-game" class="page active">
+                <div class="stats-row">
+                    <div class="stat-box"><div class="stat-box-title">Room</div><div class="stat-box-value gold" id="adm-room-name">Classic 10 ETB</div></div>
+                    <div class="stat-box"><div class="stat-box-title">Phase</div><div class="stat-box-value green" id="adm-game-phase">WAITING</div></div>
+                    <div class="stat-box"><div class="stat-box-title">Cartela Selection Timer</div><div class="stat-box-value cyan" id="adm-countdown-timer">Waiting</div></div>
+                    <div class="stat-box"><div class="stat-box-title">Calls / Last</div><div class="stat-box-value blue" id="adm-calls-display">0 / --</div></div>
+                    <div class="stat-box"><div class="stat-box-title">Cards Sold / Derash</div><div class="stat-box-value gold" id="adm-cards-derash">0 / 0 ETB</div></div>
+                </div>
+
+                <div class="filter-section">
+                    <div style="font-weight:800; font-size:13px; color:var(--gold);"><i class="fas fa-sliders-h"></i> Room Controls:</div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                        <button class="btn btn-success" onclick="adminRoomAction('start-game')"><i class="fas fa-play"></i> Start Round</button>
+                        <button class="btn btn-danger" onclick="adminRoomAction('stop-game')"><i class="fas fa-stop"></i> Stop / Reset</button>
+                        
+                        <div style="display:flex; gap:4px; margin-left: 6px; border-left: 2px solid var(--border); padding-left: 10px;">
+                            <input type="number" id="manual-call-input" min="1" max="75" placeholder="1-75" style="width: 75px; padding: 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-weight:bold;">
+                            <button class="btn btn-primary btn-sm" onclick="callSpecificNumber()"><i class="fas fa-bullhorn"></i> Call Number</button>
+                        </div>
+
+                        <select class="form-control" id="speed-select" onchange="changeSpeed()" style="width: 110px; margin-left: 6px; padding:7px;">
+                            <option value="3">Speed 3s</option><option value="5" selected>Speed 5s</option><option value="7">Speed 7s</option>
+                        </select>
+                        <button class="btn btn-warning" id="auto-btn" onclick="toggleAuto()"><i class="fas fa-robot"></i> Auto: ON</button>
+                        
+                        <button class="btn btn-danger" id="force-win-btn" onclick="toggleForceWin()" style="margin-left: 6px;"><i class="fas fa-bolt"></i> Force Bot Win</button>
+                    </div>
+
+                    <!-- Room Configuration: Cartelas Pool & Ghost Bots Controls -->
+                    <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; align-items:center;">
+                        <!-- Cartelas Adjustment -->
+                        <div style="display:flex; gap:8px; align-items:center; background:rgba(0,0,0,0.3); padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+                            <span style="font-size:12px; font-weight:bold; color:var(--cyan);"><i class="fas fa-th"></i> Cartela Pool:</span>
+                            <div style="display:flex; gap:4px;">
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 7px; font-size:11px;" onclick="setRoomMaxCardsPreset(50)">50</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 7px; font-size:11px;" onclick="setRoomMaxCardsPreset(100)">100</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 7px; font-size:11px;" onclick="setRoomMaxCardsPreset(200)">200</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 7px; font-size:11px;" onclick="setRoomMaxCardsPreset(500)">500</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 7px; font-size:11px;" onclick="setRoomMaxCardsPreset(1000)">1000</button>
+                            </div>
+                            <input type="number" id="adm-max-cards-input" min="20" max="1000" placeholder="1000" style="width:70px; padding:5px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-weight:bold;">
+                            <button class="btn btn-primary btn-sm" onclick="saveRoomMaxCards()"><i class="fas fa-check"></i> Set Pool</button>
+                        </div>
+
+                        <!-- Ghost Bots Adjustment -->
+                        <div style="display:flex; gap:8px; align-items:center; background:rgba(0,0,0,0.3); padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+                            <span style="font-size:12px; font-weight:bold; color:var(--blue);"><i class="fas fa-robot"></i> Ghost Bots: <span id="adm-current-bots" style="color:var(--gold); font-size:13px;">0</span></span>
+                            <div style="display:flex; gap:3px;">
+                                <button class="btn btn-danger btn-sm" style="padding:3px 6px; font-size:11px;" onclick="adjustRoomBots(-10)">-10</button>
+                                <button class="btn btn-danger btn-sm" style="padding:3px 6px; font-size:11px;" onclick="adjustRoomBots(-5)">-5</button>
+                                <button class="btn btn-danger btn-sm" style="padding:3px 6px; font-size:11px;" onclick="adjustRoomBots(-1)">-1</button>
+                                <button class="btn btn-success btn-sm" style="padding:3px 6px; font-size:11px;" onclick="adjustRoomBots(1)">+1</button>
+                                <button class="btn btn-success btn-sm" style="padding:3px 6px; font-size:11px;" onclick="adjustRoomBots(5)">+5</button>
+                                <button class="btn btn-success btn-sm" style="padding:3px 6px; font-size:11px;" onclick="adjustRoomBots(10)">+10</button>
+                            </div>
+                            <input type="number" id="adm-bots-input" min="0" placeholder="Bots" style="width:65px; padding:5px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-weight:bold;">
+                            <button class="btn btn-warning btn-sm" onclick="saveRoomBotCount()"><i class="fas fa-save"></i> Set</button>
+                        </div>
+
+                        <!-- Cartela Selection Countdown Timer Adjustment -->
+                        <div style="display:flex; gap:8px; align-items:center; background:rgba(0,0,0,0.3); padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+                            <span style="font-size:12px; font-weight:bold; color:var(--gold);"><i class="fas fa-stopwatch"></i> Countdown:</span>
+                            <div style="display:flex; gap:3px;">
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 6px; font-size:11px;" onclick="setRoomCountdownPreset(20)">20s</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 6px; font-size:11px;" onclick="setRoomCountdownPreset(30)">30s</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 6px; font-size:11px;" onclick="setRoomCountdownPreset(40)">40s</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 6px; font-size:11px;" onclick="setRoomCountdownPreset(50)">50s</button>
+                                <button class="btn btn-secondary btn-sm" style="padding:3px 6px; font-size:11px;" onclick="setRoomCountdownPreset(60)">60s</button>
+                            </div>
+                            <input type="number" id="adm-countdown-input" min="10" max="180" placeholder="40" style="width:65px; padding:5px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-weight:bold;">
+                            <button class="btn btn-primary btn-sm" onclick="saveRoomCountdown()"><i class="fas fa-save"></i> Set Timer</button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Navigation Cards to Players and Cartelas -->
+                    <div style="display:flex; gap:10px; margin-top:14px;">
+                        <button class="btn btn-primary" style="flex:1; justify-content:center; padding:10px;" onclick="switchPage('live-players', document.querySelectorAll('.menu-item')[1])">
+                            <i class="fas fa-users"></i> Go to Live Players Tab
+                        </button>
+                        <button class="btn btn-warning" style="flex:1; justify-content:center; padding:10px;" onclick="switchPage('live-cartelas', document.querySelectorAll('.menu-item')[2])">
+                            <i class="fas fa-trophy"></i> Go to Live Cartelas Tab
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── 2. Live Players in Room (Dedicated Tab) ─── -->
+            <div id="page-live-players" class="page">
+                <div class="table-wrapper">
+                    <div class="table-header">
+                        <div>
+                            <h3><i class="fas fa-users" style="color:var(--primary);"></i> Live Players in Room</h3>
+                            <span id="adm-real-vs-bot" style="font-size:12px; color:var(--text-muted);">Real: 0 | Bots: 0</span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button class="btn btn-primary btn-sm" onclick="loadGameStatus()"><i class="fas fa-sync"></i> Refresh</button>
+                        </div>
+                    </div>
+                    <div style="padding: 15px; display: flex; flex-wrap: wrap; gap: 10px; min-height: 250px;" id="active-players-list">
+                        <span style="color:var(--text-muted); font-size:12px;">No active players in room.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── 3. Live Cartela Proximity & Completion (Dedicated Tab) ─── -->
+            <div id="page-live-cartelas" class="page">
+                <div class="table-wrapper">
+                    <div class="table-header">
+                        <div>
+                            <h3><i class="fas fa-trophy" style="color:var(--gold);"></i> Live Cartela Proximity & Completion</h3>
+                            <span style="font-size:11px; color:var(--text-muted);">Cartelas closest to Bingo (most completed) appear at the top in real-time</span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <span class="badge" id="adm-near-win-badge" style="background:rgba(239,68,68,0.2); color:#ef4444; border:1px solid #ef4444; padding:4px 8px; border-radius:12px; font-weight:bold; font-size:11px;">0 Near Win</span>
+                            <button class="btn btn-primary btn-sm" onclick="loadGameStatus()"><i class="fas fa-sync"></i> Refresh</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:65px;">Rank</th>
+                                    <th>Cartela #</th>
+                                    <th>Player</th>
+                                    <th>Type</th>
+                                    <th>Proximity</th>
+                                    <th>Progress</th>
+                                    <th style="width:90px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="live-cartelas-table-body">
+                                <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:15px;">No active cards in room.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- ─── Dashboard ─── -->
+            <div id="page-dashboard" class="page">
+                <div class="stats-row">
+                    <div class="stat-box"><div class="stat-box-title">NET HOUSE PROFIT</div><div class="stat-box-value gold" id="stat-net-revenue">ETB 0.00</div></div>
+                    <div class="stat-box"><div class="stat-box-title">TOTAL REGISTERED PLAYERS</div><div class="stat-box-value blue" id="stat-unique-players">0</div></div>
+                    <div class="stat-box"><div class="stat-box-title">TODAY'S DEPOSIT</div><div class="stat-box-value green" id="daily-dep">ETB 0.00</div></div>
+                    <div class="stat-box"><div class="stat-box-title">TODAY'S WITHDRAW</div><div class="stat-box-value" style="color:var(--danger)" id="daily-wd">ETB 0.00</div></div>
+                </div>
+                <div class="stats-row">
+                    <div class="stat-box"><div class="stat-box-title">WEEKLY DEPOSIT</div><div class="stat-box-value green" id="weekly-dep">ETB 0.00</div></div>
+                    <div class="stat-box"><div class="stat-box-title">WEEKLY WITHDRAW</div><div class="stat-box-value" style="color:var(--danger)" id="weekly-wd">ETB 0.00</div></div>
+                    <div class="stat-box"><div class="stat-box-title">MONTHLY DEPOSIT</div><div class="stat-box-value green" id="monthly-dep">ETB 0.00</div></div>
+                    <div class="stat-box"><div class="stat-box-title">MONTHLY WITHDRAW</div><div class="stat-box-value" style="color:var(--danger)" id="monthly-wd">ETB 0.00</div></div>
+                </div>
+                <div class="table-wrapper">
+                    <div class="table-header"><h3>Recent Transactions</h3></div>
+                    <div class="table-responsive">
+                        <table><thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="dashboard-recent-txns"></tbody></table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Bot Management ─── -->
+            <div id="page-bots" class="page">
+                <div class="table-wrapper" style="padding: 25px; max-width: 650px;">
+                    <h3 style="margin-bottom: 20px; color: var(--primary);"><i class="fas fa-robot"></i> Ghost Bot Simulator</h3>
+                    <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="bot-enabled" style="width: 18px; height: 18px;">
+                        <label for="bot-enabled" style="font-size: 14px; font-weight:bold;">Enable Ghost Bots</label>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 13px; color: var(--text-muted);">Default Ghost Users Count</label>
+                        <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
+                            <button class="btn btn-danger btn-sm" onclick="adjustGlobalBots(-10)">-10</button>
+                            <button class="btn btn-danger btn-sm" onclick="adjustGlobalBots(-5)">-5</button>
+                            <button class="btn btn-danger btn-sm" onclick="adjustGlobalBots(-1)">-1</button>
+                            <input type="number" id="bot-count-input" class="form-control" style="width:100px; text-align:center; font-weight:bold;" value="50">
+                            <button class="btn btn-success btn-sm" onclick="adjustGlobalBots(1)">+1</button>
+                            <button class="btn btn-success btn-sm" onclick="adjustGlobalBots(5)">+5</button>
+                            <button class="btn btn-success btn-sm" onclick="adjustGlobalBots(10)">+10</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 13px; color: var(--text-muted);">Bot Win Rate (%)</label>
+                        <input type="number" id="bot-win-rate" class="form-control mt-1" placeholder="100" max="100">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-size: 13px; color: var(--text-muted);">Bot Names (Comma Separated)</label>
+                        <textarea id="bot-names" class="form-control mt-1" rows="3" placeholder="Abebe, Kebede..."></textarea>
+                    </div>
+                    <button class="btn btn-success" onclick="saveBotSettings()" style="width: 100%; padding:14px;"><i class="fas fa-save"></i> Save Bot Settings</button>
+                </div>
+            </div>
+
+            <!-- ─── Users Directory ─── -->
+            <div id="page-users" class="page">
+                <div class="table-wrapper">
+                    <div class="table-header">
+                        <h3>Users Directory</h3>
+                        <input type="text" id="player-search" placeholder="Search name/ID/phone..." oninput="filterPlayers()" style="padding:7px 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-weight:bold; width:220px;">
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th>Name</th><th>ID</th><th>Phone</th><th>Play Bal</th><th>Win Bal</th><th>Action</th></tr></thead>
+                            <tbody id="players-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Deposits & Withdrawals ─── -->
+            <div id="page-deposits" class="page">
+                <div class="table-wrapper">
+                    <div class="table-header"><h3>Deposit Requests</h3><button class="btn btn-primary btn-sm" onclick="loadTransactions('deposit')"><i class="fas fa-sync"></i> Refresh</button></div>
+                    <div class="table-responsive"><table><thead><tr><th>User</th><th>Amount</th><th>Ref / Txn ID</th><th>Status</th><th>Action</th></tr></thead><tbody id="deposit-table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <div id="page-withdrawals" class="page">
+                <div class="table-wrapper">
+                    <div class="table-header"><h3>Withdrawal Requests</h3><button class="btn btn-primary btn-sm" onclick="loadTransactions('withdrawal')"><i class="fas fa-sync"></i> Refresh</button></div>
+                    <div class="table-responsive"><table><thead><tr><th>User</th><th>Amount</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead><tbody id="withdrawal-table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- ─── Promo Codes ─── -->
+            <div id="page-promo" class="page">
+                <div class="table-wrapper" style="padding: 20px; max-width: 650px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 12px; color: var(--primary);"><i class="fas fa-tags"></i> Create Promo Code</h3>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
+                        <div><label style="color:var(--text-muted); font-size:12px;">Code</label><input type="text" id="promo-code" class="form-control" placeholder="e.g. MEGA50" style="text-transform:uppercase;"></div>
+                        <div><label style="color:var(--text-muted); font-size:12px;">Amount (ETB)</label><input type="number" id="promo-amount" class="form-control" placeholder="50"></div>
+                        <div><label style="color:var(--text-muted); font-size:12px;">Max Uses</label><input type="number" id="promo-max-uses" class="form-control" placeholder="100"></div>
+                        <div><label style="color:var(--text-muted); font-size:12px;">Duration (Mins)</label><input type="number" id="promo-duration" class="form-control" value="1440"></div>
+                    </div>
+                    <button class="btn btn-success" style="width: 100%; padding: 12px;" onclick="createPromoCode()"><i class="fas fa-plus"></i> Create Code</button>
+                </div>
+                <div class="table-wrapper">
+                    <div class="table-header"><h3>Active Promo Codes</h3><button class="btn btn-primary btn-sm" onclick="loadPromoCodes()"><i class="fas fa-sync"></i></button></div>
+                    <div class="table-responsive"><table><thead><tr><th>Code</th><th>Amount</th><th>Used / Max</th><th>Expires At</th><th>Status</th><th>Action</th></tr></thead><tbody id="promo-table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- ─── Broadcast ─── -->
+            <div id="page-broadcast" class="page">
+                <div class="table-wrapper" style="padding: 20px; max-width: 650px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 12px; color: var(--primary);"><i class="fas fa-bullhorn"></i> Send Broadcast Message</h3>
+                    <div style="margin-bottom: 12px;"><label style="color:var(--text-muted); font-size:12px;">HTML Message Content</label><textarea id="broadcast-msg" class="form-control mt-1" rows="4" placeholder="Type broadcast message..."></textarea></div>
+                    <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="sendBroadcast()"><i class="fas fa-paper-plane"></i> Send to All Players</button>
+                </div>
+                <div class="table-wrapper">
+                    <div class="table-header"><h3>Broadcast Logs & Management</h3><button class="btn btn-primary btn-sm" onclick="loadBroadcasts()"><i class="fas fa-sync"></i> Refresh</button></div>
+                    <div class="table-responsive"><table><thead><tr><th>Date</th><th>Message</th><th>Sent Count</th><th>Action</th></tr></thead><tbody id="broadcast-table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- ─── Giveaway ─── -->
+            <div id="page-giveaway" class="page">
+                <div class="table-wrapper" style="padding: 20px; max-width: 650px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 12px; color: var(--primary);"><i class="fas fa-gift"></i> Create Giveaway</h3>
+                    <div style="margin-bottom: 10px;"><label style="color:var(--text-muted); font-size:12px;">Amount per User (ETB)</label><input type="number" id="giveaway-amount" class="form-control" placeholder="15"></div>
+                    <div style="margin-bottom: 10px;"><label style="color:var(--text-muted); font-size:12px;">Total Users Limit</label><input type="number" id="giveaway-total-users" class="form-control" placeholder="500"></div>
+                    <div style="margin-bottom: 12px;"><label style="color:var(--text-muted); font-size:12px;">Duration (Minutes)</label><input type="number" id="giveaway-duration" class="form-control" value="60"></div>
+                    <button class="btn btn-success" style="width: 100%; padding: 12px;" onclick="createGiveaway()"><i class="fas fa-gift"></i> Launch Giveaway</button>
+                </div>
+                <div class="table-wrapper">
+                    <div class="table-header"><h3>Giveaway Campaigns</h3><button class="btn btn-primary btn-sm" onclick="loadGiveaways()"><i class="fas fa-sync"></i> Refresh</button></div>
+                    <div class="table-responsive"><table><thead><tr><th>Date</th><th>Amount</th><th>Total Users</th><th>Claimed</th><th>Status</th><th>Action</th></tr></thead><tbody id="giveaway-table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- ─── Referrals ─── -->
+            <div id="page-referrals" class="page">
+                <div class="table-wrapper">
+                    <div class="table-header"><h3>Referrals Leaderboard</h3><button class="btn btn-primary btn-sm" onclick="loadReferrals()"><i class="fas fa-sync"></i></button></div>
+                    <div class="table-responsive"><table><thead><tr><th>Rank</th><th>Inviter Name</th><th>Total Users Invited</th><th>Bonus Earned</th></tr></thead><tbody id="referral-table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- ─── Invitation Bonus Settings ─── -->
+            <div id="page-invitation-bonus" class="page">
+                <div class="table-wrapper" style="padding: 25px; max-width: 650px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 8px; color: var(--gold);"><i class="fas fa-gift"></i> Invitation & Referral Bonus Control</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
+                        Configure referral reward amounts. Changes take effect immediately across all Telegram bot invite links and Web App players.
+                    </p>
+
+                    <div style="margin-bottom: 18px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: rgba(0,0,0,0.2);">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="ref-enabled" style="width: 18px; height: 18px;" checked>
+                            <label for="ref-enabled" style="font-size: 14px; font-weight: bold; color: var(--text);">Enable Referral Reward Program</label>
+                        </div>
+                    </div>
+
+                    <!-- Referrer Bonus Amount -->
+                    <div style="margin-bottom: 18px;">
+                        <label style="font-size: 13px; font-weight: bold; color: var(--gold); display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-user-plus"></i> Referrer Bonus / ለጋባዥ የሚሰጥ ቦነስ (ETB)
+                        </label>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">The bonus awarded to the person who invites a friend (credited to Play & Referral balance).</p>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="number" id="ref-referrer-bonus" class="form-control" style="font-size: 16px; font-weight: 900; color: var(--gold);" value="30">
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referrer', 10)">10</button>
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referrer', 20)">20</button>
+                            <button class="btn btn-warning btn-sm" onclick="setRefPreset('referrer', 30)">30</button>
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referrer', 50)">50</button>
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referrer', 100)">100</button>
+                        </div>
+                    </div>
+
+                    <!-- Referee Bonus Amount -->
+                    <div style="margin-bottom: 22px;">
+                        <label style="font-size: 13px; font-weight: bold; color: var(--success); display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-user-check"></i> Referee (New User) Welcome Bonus / ለተጋባዥ የሚሰጥ ቦነስ (ETB)
+                        </label>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">The welcome bonus given to the new player upon joining through an invite link.</p>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="number" id="ref-referee-bonus" class="form-control" style="font-size: 16px; font-weight: 900; color: var(--success);" value="20">
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referee', 0)">0</button>
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referee', 10)">10</button>
+                            <button class="btn btn-warning btn-sm" onclick="setRefPreset('referee', 20)">20</button>
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referee', 30)">30</button>
+                            <button class="btn btn-primary btn-sm" onclick="setRefPreset('referee', 50)">50</button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success" onclick="saveInvitationBonusSettings()" style="width: 100%; padding: 14px; font-size: 14px;">
+                        <i class="fas fa-broadcast-tower"></i> Save & Broadcast to All Users
+                    </button>
+                </div>
+            </div>
+
+            <!-- ─── Timed Deposit Bonus (%) ─── -->
+            <div id="page-deposit-bonus" class="page">
+                <div class="table-wrapper" style="padding: 25px; max-width: 650px;">
+                    <h3 style="margin-bottom: 8px; color: var(--gold);"><i class="fas fa-percentage"></i> Timed Deposit Bonus (%)</h3>
+                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px;">
+                        Configure promotional deposit bonus percentage that rewards players with extra bonus Play Balance for deposits approved during an admin-specified duration.
+                    </p>
+
+                    <!-- Status Banner -->
+                    <div id="adm-dep-bonus-status-banner" style="padding: 14px; border-radius: 8px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); border: 1px solid var(--border);">
+                        <div>
+                            <div style="font-size: 11px; text-transform: uppercase; font-weight: bold; color: var(--text-muted);">Promotion Status</div>
+                            <div id="adm-dep-bonus-status-text" style="font-size: 15px; font-weight: 900; color: #ef4444; margin-top: 2px;">⚪ Inactive / Disabled</div>
+                            <div id="adm-dep-bonus-expiry-text" style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">No active time window</div>
+                        </div>
+                        <div id="adm-dep-bonus-badge" style="background: rgba(239,68,68,0.2); color: #ef4444; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px;">OFF</div>
+                    </div>
+
+                    <!-- Master Toggle -->
+                    <div style="margin-bottom: 18px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: rgba(0,0,0,0.2);">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="adm-dep-bonus-enabled" style="width: 18px; height: 18px;">
+                            <label for="adm-dep-bonus-enabled" style="font-size: 14px; font-weight: bold; color: var(--text);">Enable Timed Deposit Bonus Promotion</label>
+                        </div>
+                    </div>
+
+                    <!-- Bonus Percentage -->
+                    <div style="margin-bottom: 18px;">
+                        <label style="font-size: 13px; font-weight: bold; color: var(--gold); display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-coins"></i> Deposit Bonus Percentage / የቦነስ መቶኛ (%)
+                        </label>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">Percentage of deposited amount added as bonus (e.g., 50% on 100 ETB = 50 ETB bonus, total 150 ETB).</p>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="number" id="adm-dep-bonus-percent" class="form-control" style="font-size: 16px; font-weight: 900; color: var(--gold);" value="50" min="1" max="500">
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusPercentPreset(10)">10%</button>
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusPercentPreset(20)">20%</button>
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusPercentPreset(30)">30%</button>
+                            <button class="btn btn-warning btn-sm" onclick="setDepBonusPercentPreset(50)">50%</button>
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusPercentPreset(100)">100%</button>
+                        </div>
+                    </div>
+
+                    <!-- Duration in Hours -->
+                    <div style="margin-bottom: 22px;">
+                        <label style="font-size: 13px; font-weight: bold; color: var(--cyan); display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-clock"></i> Active Duration / የቆይታ ጊዜ (Hours)
+                        </label>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">How many hours from now the bonus promotion will stay active.</p>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="number" id="adm-dep-bonus-duration" class="form-control" style="font-size: 16px; font-weight: 900; color: var(--cyan);" value="24" min="0.5" step="0.5">
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusDurationPreset(1)">1h</button>
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusDurationPreset(3)">3h</button>
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusDurationPreset(6)">6h</button>
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusDurationPreset(12)">12h</button>
+                            <button class="btn btn-warning btn-sm" onclick="setDepBonusDurationPreset(24)">24h</button>
+                            <button class="btn btn-primary btn-sm" onclick="setDepBonusDurationPreset(48)">48h</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-success" onclick="saveDepositBonusSettings(true)" style="flex: 2; padding: 14px; font-size: 14px;">
+                            <i class="fas fa-broadcast-tower"></i> Save & Activate Bonus
+                        </button>
+                        <button class="btn btn-danger" onclick="saveDepositBonusSettings(false)" style="flex: 1; padding: 14px; font-size: 14px;">
+                            <i class="fas fa-stop"></i> Deactivate
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Game History ─── -->
+            <div id="page-history" class="page">
+                <div class="table-wrapper">
+                    <div class="table-header">
+                        <h3>Game History Logs</h3>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-danger btn-sm" onclick="clearAllGameHistory()"><i class="fas fa-trash-alt"></i> Clear All History</button>
+                            <button class="btn btn-primary btn-sm" onclick="loadGameHistory()"><i class="fas fa-sync"></i> Refresh</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive"><table><thead><tr><th>Date</th><th>Room</th><th>Winners</th><th>Total Prize</th><th>Players</th><th>Action</th></tr></thead><tbody id="history-table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- ─── Settings ─── -->
+            <div id="page-settings" class="page">
+                <div class="table-wrapper" style="padding: 25px; max-width: 600px;">
+                    <h3 style="margin-bottom: 15px; color: var(--primary);"><i class="fas fa-cog"></i> Global Payment & Game Settings</h3>
+                    <div style="margin-bottom: 12px;">
+                        <label><i class="fab fa-telegram" style="color:var(--blue);"></i> Support Telegram Username</label>
+                        <input type="text" id="set-support-username" class="form-control mt-1" placeholder="@Tazikes">
+                        <small style="color:var(--text-muted); font-size:11px;">e.g., @Tazikes or your support link. Updates Bot and Mini App support links immediately.</small>
+                    </div>
+                    <div style="margin-bottom: 12px;"><label>Telebirr Number</label><input type="text" id="set-telebirr" class="form-control mt-1"></div>
+                    <div style="margin-bottom: 12px;"><label>Telebirr Name</label><input type="text" id="set-telebirr-name" class="form-control mt-1"></div>
+                    <div style="margin-bottom: 12px;">
+                        <label><i class="fas fa-stopwatch" style="color:var(--gold);"></i> Default Cartela Selection Countdown Timer (seconds)</label>
+                        <input type="number" id="set-countdown-time" min="10" max="180" class="form-control mt-1" placeholder="40">
+                    </div>
+                    <div style="margin-bottom: 15px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: rgba(0,0,0,0.2);">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="enable-double-deposit" style="width: 18px; height: 18px;">
+                            <label for="enable-double-deposit" style="font-size: 13px; font-weight: bold; color: var(--gold);">🔥 Enable Double Deposit Bonus</label>
+                        </div>
+                    </div>
+                    <button class="btn btn-success" onclick="saveGlobalSettings()" style="width: 100%; padding:14px;"><i class="fas fa-save"></i> Save Settings</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Player Details Side Panel -->
+<div class="side-panel-overlay" id="player-overlay" onclick="closePlayerPanel()"></div>
+<div class="side-panel" id="player-panel">
+    <div class="side-panel-header">
+        <h2><i class="fas fa-user-circle"></i> Player Details</h2>
+        <button class="close-panel" onclick="closePlayerPanel()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="side-panel-body">
+        <div style="text-align: center; margin-bottom: 15px;">
+            <h3 id="p-name" style="font-size: 18px;">-</h3>
+            <p id="p-id" style="color: var(--text-muted); font-size: 12px;">ID: -</p>
+        </div>
+        <div class="info-row"><span>Play Balance:</span><span id="p-play" style="color: var(--gold);">0.00</span></div>
+        <div class="info-row"><span>Win Balance:</span><span id="p-win" style="color: var(--success);">0.00</span></div>
+        <div class="info-row"><span>Phone:</span><span id="p-phone">-</span></div>
+        <div class="info-row"><span>Games / Wins:</span><span id="p-games-wins">0 / 0</span></div>
+        <div class="info-row"><span>Joined:</span><span id="p-joined">-</span></div>
+        <div class="info-row"><span>Invited By (ጋባዥ):</span><span id="p-invited-by" style="color: var(--blue); font-weight: bold;">None</span></div>
+        <div class="info-row"><span>Total Invited (የጋበዛቸው):</span><span id="p-invited-count" style="color: var(--gold); font-weight: bold;">0</span></div>
+
+        <div style="margin-top: 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <label style="font-size:12px; color:var(--text-muted); font-weight:bold;"><i class="fas fa-users"></i> Users Invited By This Player</label>
+                <span id="p-invited-badge" style="font-size:10px; background:rgba(250,204,21,0.2); color:var(--gold); padding:2px 6px; border-radius:10px;">0 users</span>
+            </div>
+            <div id="p-invited-list" style="max-height: 130px; overflow-y: auto; background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 8px; padding: 6px; font-size: 11px;">
+                <span style="color:var(--text-muted);">None</span>
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <label style="font-size:12px; color:var(--text-muted);">Adjust Balance</label>
+            <div style="display:flex; gap:6px; margin-top:5px;">
+                <input type="number" id="adjust-play-bal" class="form-control" placeholder="Play Bal">
+                <input type="number" id="adjust-win-bal" class="form-control" placeholder="Win Bal">
+                <button class="btn btn-warning btn-sm" onclick="saveAdjustedBalance()">Save</button>
+            </div>
+        </div>
+
+        <div style="margin-top: 15px;">
+            <label style="font-size:12px; color:var(--text-muted);">Direct Telegram Message</label>
+            <div style="display:flex; gap:6px; margin-top:5px;">
+                <input type="text" id="direct-msg-input" class="form-control" placeholder="Type message...">
+                <button class="btn btn-primary" onclick="sendDirectMessage()"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-direction: column; margin-top: 15px;">
+            <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="viewPlayerCards()"><i class="fas fa-eye"></i> View Live Cards</button>
+            <button class="btn btn-danger" style="width: 100%; justify-content: center;" onclick="deletePlayerProfile()"><i class="fas fa-trash"></i> Delete Player</button>
+        </div>
+    </div>
+</div>
+
+<!-- Cards Modal -->
+<div id="cards-modal">
+    <div class="cards-modal-content">
+        <div class="cards-modal-header">
+            <h3 id="cards-modal-title" style="color: var(--primary);">Player's Cards</h3>
+            <button class="close-panel" onclick="document.getElementById('cards-modal').classList.remove('active')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="cards-modal-body" id="cards-modal-body"></div>
+    </div>
+</div>
+
+<script>
+let currentPage = 'game';
+let currentAdminRoomId = 'classic_10';
+let AUTH_TOKEN = sessionStorage.getItem('admin_auth') || "";
+let gameStatusInterval = null;
+let pollInterval = null;
+let allPlayersData = [];
+let currentSelectedPlayer = null;
+let lastPendingDeposits = 0;
+let lastPendingWithdrawals = 0;
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
+function showToast(msg, isError = false) {
+    const toast = document.getElementById('admin-toast');
+    toast.innerText = msg;
+    toast.classList.toggle('error', isError);
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+
+async function apiFetch(url, method = 'GET', body = null) {
+    const finalUrl = url.startsWith('http') ? url : ((typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : '') + url);
+    const headers = { 'Content-Type': 'application/json' };
+    if (AUTH_TOKEN) headers['Authorization'] = AUTH_TOKEN;
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(finalUrl, opts);
+    if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
+    return await res.json();
+}
+
+async function attemptLogin() {
+    const user = document.getElementById('login-username').value.trim();
+    const pass = document.getElementById('login-password').value.trim();
+    const btn = document.getElementById('login-btn');
+    const err = document.getElementById('login-error');
+    err.style.display = 'none';
+    btn.disabled = true; btn.innerText = 'Verifying...';
+    const basicAuth = 'Basic ' + btoa(user + ':' + pass);
+    try {
+        const loginUrl = (typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : '') + '/api/admin/dashboard';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const res = await fetch(loginUrl, { 
+            headers: { 'Authorization': basicAuth },
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+            AUTH_TOKEN = basicAuth;
+            sessionStorage.setItem('admin_auth', basicAuth);
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-content').style.display = 'flex';
+            switchPage('game', document.querySelector('.menu-item'));
+            startNotificationPolling();
+        } else if (res.status === 401) {
+            err.innerText = "❌ Incorrect username or password!";
+            err.style.display = 'block';
+        } else {
+            err.innerText = `❌ Server returned HTTP ${res.status} ${res.statusText}. Please verify your Render logs!`;
+            err.style.display = 'block';
+        }
+    } catch (e) {
+        if (e.name === 'AbortError') {
+            err.innerText = "❌ Connection timed out (12s). The Render backend is sleeping or unreachable!";
+        } else {
+            err.innerText = `❌ Connection error: ${e.message}. Backend URL: ${typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : 'Not configured'}`;
+        }
+        err.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.innerText = 'ENTER COMMAND CENTER';
+    }
+}
+
+function logout() { AUTH_TOKEN = ""; sessionStorage.removeItem('admin_auth'); location.reload(); }
+
+function switchPage(pageId, element) {
+    currentPage = pageId;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+    const target = document.getElementById(`page-${pageId}`);
+    if (target) target.classList.add('active');
+    if (element) element.classList.add('active');
+    if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('active');
+
+    const titles = {
+        game: 'Live Command Center',
+        'live-players': 'Live Players in Room',
+        'live-cartelas': 'Live Cartela Proximity & Completion',
+        dashboard: 'Financial Dashboard',
+        bots: 'Ghost Bot Simulator',
+        users: 'Users Directory',
+        deposits: 'Deposit Approvals',
+        withdrawals: 'Withdrawal Approvals',
+        promo: 'Promo Codes',
+        broadcast: 'Broadcasts',
+        giveaway: 'Giveaways',
+        referrals: 'Referral Leaderboard',
+        'deposit-bonus': 'Timed Deposit Bonus (%)',
+        'invitation-bonus': 'Invitation Bonus Settings',
+        history: 'Game History',
+        settings: 'Settings'
+    };
+    document.getElementById('page-title').innerText = titles[pageId] || 'Admin';
+
+    if (pageId === 'game' || pageId === 'live-players' || pageId === 'live-cartelas') {
+        startGameStatusPolling();
+    }
+    else if (pageId === 'dashboard') loadDashboardData();
+    else if (pageId === 'bots') loadBotSettings();
+    else if (pageId === 'users') loadPlayers();
+    else if (pageId === 'deposits') loadTransactions('deposit');
+    else if (pageId === 'withdrawals') loadTransactions('withdrawal');
+    else if (pageId === 'promo') loadPromoCodes();
+    else if (pageId === 'broadcast') loadBroadcasts();
+    else if (pageId === 'giveaway') loadGiveaways();
+    else if (pageId === 'referrals') loadReferrals();
+    else if (pageId === 'deposit-bonus') loadDepositBonusSettings();
+    else if (pageId === 'invitation-bonus') loadInvitationBonusSettings();
+    else if (pageId === 'history') loadGameHistory();
+    else if (pageId === 'settings') loadGlobalSettings();
+
+    if (pageId !== 'game' && pageId !== 'live-players' && pageId !== 'live-cartelas' && gameStatusInterval) {
+        clearInterval(gameStatusInterval);
+        gameStatusInterval = null;
+    }
+}
+
+// ─── Room Switching ───
+function selectAdminRoom(roomId) {
+    currentAdminRoomId = 'classic_10';
+    document.getElementById('adm-room-name').innerText = 'Classic 10 ETB';
+    loadGameStatus();
+}
+
+function startGameStatusPolling() {
+    if (gameStatusInterval) return;
+    loadGameStatus();
+    gameStatusInterval = setInterval(() => {
+        if (!document.hidden && (currentPage === 'game' || currentPage === 'live-players' || currentPage === 'live-cartelas')) {
+            loadGameStatus();
+        }
+    }, 8000);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && (currentPage === 'game' || currentPage === 'live-players' || currentPage === 'live-cartelas')) {
+        loadGameStatus();
+    }
+});
+
+async function loadGameStatus() {
+    try {
+        const d = await apiFetch(`/api/admin/game-status?roomId=${currentAdminRoomId}`);
+        if (d.success && d.data) {
+            const room = d.data;
+            document.getElementById('adm-game-phase').innerText = (room.phase || 'WAITING').toUpperCase();
+
+            // Cartela Selection Countdown Timer
+            const timerEl = document.getElementById('adm-countdown-timer');
+            if (timerEl) {
+                if (room.phase === 'countdown') {
+                    timerEl.innerText = `${room.remainingTime || 0}s`;
+                    timerEl.style.color = 'var(--cyan)';
+                } else if (room.phase === 'calling') {
+                    timerEl.innerText = 'Calling';
+                    timerEl.style.color = 'var(--gold)';
+                } else {
+                    timerEl.innerText = 'Waiting';
+                    timerEl.style.color = 'var(--text-muted)';
+                }
+            }
+            
+            const callCount = room.calledNumbers ? room.calledNumbers.length : 0;
+            const lastNum = room.currentCall || (room.calledNumbers && room.calledNumbers.length ? room.calledNumbers[room.calledNumbers.length - 1] : null);
+            let lastDisplay = '--';
+            if (lastNum) {
+                const prefix = lastNum <= 15 ? 'B' : lastNum <= 30 ? 'I' : lastNum <= 45 ? 'N' : lastNum <= 60 ? 'G' : 'O';
+                lastDisplay = `${prefix}-${lastNum}`;
+            }
+            document.getElementById('adm-calls-display').innerText = `${callCount} / ${lastDisplay}`;
+            document.getElementById('adm-cards-derash').innerText = `${room.totalCards || 0} / ${room.derash || ((room.totalCards || 0) * (room.derashPerCard || 8))} ETB`;
+
+            const realCount = room.realPlayersCount || 0;
+            const botCount = (room.totalPlayers || 0) - realCount;
+            document.getElementById('adm-real-vs-bot').innerText = `Real: ${realCount} | Bots: ${Math.max(0, botCount)}`;
+
+            const fwBtn = document.getElementById('force-win-btn');
+            if (room.isForceWinActive) {
+                fwBtn.innerHTML = '<i class="fas fa-bolt"></i> Force Win: ON';
+                fwBtn.style.background = '#10b981';
+                fwBtn.style.color = '#000';
+            } else {
+                fwBtn.innerHTML = '<i class="fas fa-bolt"></i> Force Win: OFF';
+                fwBtn.style.background = 'var(--danger)';
+                fwBtn.style.color = '#fff';
+            }
+
+            const autoBtn = document.getElementById('auto-btn');
+            autoBtn.innerHTML = room.isAutoOn ? '<i class="fas fa-robot"></i> Auto: ON' : '<i class="fas fa-robot"></i> Auto: OFF';
+            autoBtn.className = room.isAutoOn ? 'btn btn-success' : 'btn btn-warning';
+
+            // Update Pool & Bots Inputs
+            if (room.settings) {
+                const maxCardsInput = document.getElementById('adm-max-cards-input');
+                if (maxCardsInput && !maxCardsInput.matches(':focus')) {
+                    maxCardsInput.value = room.settings.maxCards || 500;
+                }
+                const botCountVal = room.settings.botCount !== undefined ? room.settings.botCount : 0;
+                const botsInput = document.getElementById('adm-bots-input');
+                if (botsInput && !botsInput.matches(':focus')) {
+                    botsInput.value = botCountVal;
+                }
+                const curBotsEl = document.getElementById('adm-current-bots');
+                if (curBotsEl) curBotsEl.innerText = botCountVal;
+
+                const cdInput = document.getElementById('adm-countdown-input');
+                if (cdInput && !cdInput.matches(':focus') && room.settings.countdownTime) {
+                    cdInput.value = room.settings.countdownTime;
+                }
+            }
+
+            // Active Players List
+            const plist = document.getElementById('active-players-list');
+            if (plist) {
+                if (room.phase === 'waiting' && (!room.takenCardsDetails || Object.keys(room.takenCardsDetails).length === 0)) {
+                    plist.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">No active players in room.</span>';
+                } else if (room.takenCardsDetails && Object.keys(room.takenCardsDetails).length > 0) {
+                    const playerMap = new Map();
+                    Object.entries(room.takenCardsDetails).forEach(([cardNum, data]) => {
+                        if (!playerMap.has(data.userId)) playerMap.set(data.userId, { name: data.userName, isBot: data.isBot, cards: [] });
+                        playerMap.get(data.userId).cards.push(cardNum);
+                    });
+                    let html = '';
+                    Array.from(playerMap.entries()).forEach(([userId, info]) => {
+                        let bgColor = info.isBot ? 'rgba(59,130,246,0.1)' : 'rgba(16,185,129,0.1)';
+                        let borderColor = info.isBot ? 'var(--blue)' : 'var(--primary)';
+                        let botBadge = info.isBot 
+                            ? '<span style="font-size:9px; background:var(--blue); color:#fff; padding:1px 5px; border-radius:8px;">BOT</span>' 
+                            : '<span style="font-size:9px; background:var(--primary); color:#000; padding:1px 5px; border-radius:8px; font-weight:bold;">REAL</span>';
+                        
+                        let userAction = !info.isBot 
+                            ? `onclick="fetchAndOpenPlayer('${userId}')" style="cursor:pointer;" title="Click to view player profile"` 
+                            : '';
+
+                        html += `
+                            <div ${userAction} style="background:${bgColor}; border:1px solid ${borderColor}; padding:8px 12px; border-radius:8px; min-width:150px; transition:0.2s;">
+                                <div style="font-weight:bold; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                                    <span><i class="${info.isBot ? 'fas fa-robot' : 'fas fa-user'}"></i> ${escapeHtml(info.name)}</span>
+                                    ${botBadge}
+                                </div>
+                                <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+                                    <b>${info.cards.length}</b> Cards (#${info.cards.slice(0, 4).join(', ')}${info.cards.length > 4 ? '...' : ''})
+                                </div>
+                            </div>
+                        `;
+                    });
+                    plist.innerHTML = html;
+                } else {
+                    plist.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">No active players in room.</span>';
+                }
+            }
+
+            // Live Cartela Proximity & Completion Leaderboard (Closest to Win at Top)
+            const cartelaBody = document.getElementById('live-cartelas-table-body');
+            const nearWinBadge = document.getElementById('adm-near-win-badge');
+            if (cartelaBody) {
+                if (room.phase === 'waiting' || !room.liveCardsLeaderboard || room.liveCardsLeaderboard.length === 0) {
+                    cartelaBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:18px;">No active cartelas in room. Start round to view live cards.</td></tr>';
+                    if (nearWinBadge) {
+                        nearWinBadge.innerText = '0 Near Win';
+                        nearWinBadge.style.display = 'none';
+                    }
+                } else {
+                    let rowsHtml = '';
+                    let nearWinCount = 0;
+
+                    room.liveCardsLeaderboard.forEach((c, idx) => {
+                        if (c.distance <= 2) nearWinCount++;
+                        
+                        let rankBadge = idx === 0 
+                            ? '<span style="font-weight:bold; color:var(--gold); font-size:14px;">🥇 1</span>'
+                            : idx === 1
+                            ? '<span style="font-weight:bold; color:#cbd5e1; font-size:14px;">🥈 2</span>'
+                            : idx === 2
+                            ? '<span style="font-weight:bold; color:#f59e0b; font-size:14px;">🥉 3</span>'
+                            : `<span style="color:var(--text-muted); font-size:12px;">#${idx + 1}</span>`;
+
+                        let typeBadge = c.isBot
+                            ? '<span class="badge" style="background:rgba(59,130,246,0.15); color:var(--blue); border:1px solid var(--blue); padding:2px 6px; border-radius:10px; font-size:10px; font-weight:bold;">🤖 BOT</span>'
+                            : '<span class="badge" style="background:rgba(16,185,129,0.15); color:var(--primary); border:1px solid var(--primary); padding:2px 6px; border-radius:10px; font-size:10px; font-weight:bold;">👤 REAL</span>';
+
+                        let statusBadge = '';
+                        if (c.distance === 0) {
+                            statusBadge = '<span style="background:var(--gold); color:#000; padding:3px 9px; border-radius:12px; font-weight:800; font-size:11px; box-shadow:0 0 10px rgba(250,204,21,0.6);">👑 BINGO!</span>';
+                        } else if (c.distance === 1) {
+                            statusBadge = '<span style="background:#ef4444; color:#fff; padding:3px 9px; border-radius:12px; font-weight:800; font-size:11px; box-shadow:0 0 8px rgba(239,68,68,0.6);"><i class="fas fa-fire"></i> 1 TO GO!</span>';
+                        } else if (c.distance === 2) {
+                            statusBadge = '<span style="background:rgba(245,158,11,0.2); color:#f59e0b; border:1px solid #f59e0b; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:11px;">⚡ 2 TO GO</span>';
+                        } else if (c.distance === 3) {
+                            statusBadge = '<span style="background:rgba(6,182,212,0.2); color:#06b6d4; border:1px solid #06b6d4; padding:3px 8px; border-radius:12px; font-weight:bold; font-size:11px;">🎯 3 TO GO</span>';
+                        } else {
+                            statusBadge = `<span style="color:var(--text-muted); font-size:11px;">${c.distance} TO GO</span>`;
+                        }
+
+                        let barColor = c.distance <= 1 ? '#ef4444' : (c.distance === 2 ? '#f59e0b' : 'var(--primary)');
+
+                        rowsHtml += `
+                            <tr style="${c.distance <= 1 ? 'background:rgba(239,68,68,0.06);' : ''}">
+                                <td>${rankBadge}</td>
+                                <td><span style="font-weight:bold; color:var(--gold); font-size:13px;">#${c.cardNum}</span></td>
+                                <td><span style="font-weight:600;">${escapeHtml(c.userName)}</span></td>
+                                <td>${typeBadge}</td>
+                                <td>${statusBadge}</td>
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <div style="flex:1; height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; min-width:60px;">
+                                            <div style="width:${c.percent}%; height:100%; background:${barColor};"></div>
+                                        </div>
+                                        <span style="font-size:11px; font-weight:bold; color:var(--text); white-space:nowrap;">${c.matchedCount}/24 (${c.percent}%)</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-secondary btn-sm" style="padding:3px 8px; font-size:11px;" onclick="inspectSpecificCard(${c.cardNum}, '${escapeHtml(c.userName)}')"><i class="fas fa-eye"></i> View</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    cartelaBody.innerHTML = rowsHtml;
+                    if (nearWinBadge) {
+                        nearWinBadge.innerText = `${nearWinCount} Near Win`;
+                        nearWinBadge.style.display = nearWinCount > 0 ? 'inline-block' : 'none';
+                    }
+                }
+            }
+        }
+    } catch(e) {}
+}
+
+async function setRoomMaxCardsPreset(num) {
+    document.getElementById('adm-max-cards-input').value = num;
+    await saveRoomMaxCards();
+}
+
+async function saveRoomMaxCards() {
+    const val = Number(document.getElementById('adm-max-cards-input').value);
+    if (!val || val < 20 || val > 1000) return showToast('Enter between 20 and 1000', true);
+    try {
+        const res = await apiFetch(`/api/admin/room/${currentAdminRoomId}/max-cards`, 'POST', { maxCards: val });
+        if (res.success) {
+            showToast(`Cartela pool set to ${val}!`);
+            loadGameStatus();
+        }
+    } catch(e) { showToast('Failed to set cartela pool', true); }
+}
+
+async function adjustRoomBots(delta) {
+    try {
+        const res = await apiFetch(`/api/admin/room/${currentAdminRoomId}/adjust-bots`, 'POST', { delta });
+        if (res.success) {
+            showToast(`Ghost bots adjusted to ${res.botCount}!`);
+            loadGameStatus();
+        }
+    } catch(e) { showToast('Bot adjust failed', true); }
+}
+
+async function saveRoomBotCount() {
+    const val = Number(document.getElementById('adm-bots-input').value);
+    if (isNaN(val) || val < 0) return showToast('Enter valid bot count', true);
+    try {
+        const res = await apiFetch(`/api/admin/room/${currentAdminRoomId}/adjust-bots`, 'POST', { botCount: val });
+        if (res.success) {
+            showToast(`Ghost bots set to ${res.botCount}!`);
+            loadGameStatus();
+        }
+    } catch(e) { showToast('Bot set failed', true); }
+}
+
+function adjustGlobalBots(delta) {
+    const el = document.getElementById('bot-count-input');
+    if (!el) return;
+    const val = Math.max(0, (Number(el.value) || 0) + delta);
+    el.value = val;
+}
+
+function inspectSpecificCard(cardNum, ownerName) {
+    const modalBody = document.getElementById('cards-modal-body');
+    document.getElementById('cards-modal-title').innerText = `Card #${cardNum} (${ownerName})`;
+    modalBody.innerHTML = '<div style="text-align:center; width:100%; color:var(--text-muted); padding:20px;">Generating card matrix...</div>';
+    document.getElementById('cards-modal').classList.add('active');
+
+    apiFetch(`/api/admin/game-status?roomId=${currentAdminRoomId}`).then(d => {
+        const calledNumbers = d.data?.calledNumbers || [];
+        const matrix = generateCardLayout(cardNum);
+        let html = `<div class="bingo-grid" style="margin: 0 auto; max-width: 320px;"><div style="text-align:center; color:var(--gold); margin-bottom:8px; font-weight:bold; font-size:14px;">CARD #${cardNum} - ${escapeHtml(ownerName)}</div><div class="grid-letters"><div style="background:#3b82f6;">B</div><div style="background:#ef4444;">I</div><div style="background:#10b981;">N</div><div style="background:#f59e0b;">G</div><div style="background:#8b5cf6;">O</div></div><div class="grid-cells">`;
+        for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 5; c++) {
+                let val = matrix[c][r];
+                let isCalled = calledNumbers.includes(val);
+                html += `<div class="grid-cell ${val === 'FREE' ? 'free' : (isCalled ? 'marked' : '')}">${val}</div>`;
+            }
+        }
+        html += `</div></div>`;
+        modalBody.innerHTML = html;
+    }).catch(() => {
+        modalBody.innerHTML = 'Failed to load card preview';
+    });
+}
+
+async function adminRoomAction(action) {
+    try {
+        const res = await apiFetch(`/api/admin/room/${currentAdminRoomId}/${action}`, 'POST');
+        if (res.success) {
+            showToast(`Room action ${action} executed!`);
+            loadGameStatus();
+        }
+    } catch(e) { showToast('Action failed', true); }
+}
+
+async function callSpecificNumber() {
+    const num = Number(document.getElementById('manual-call-input').value);
+    if (!num || num < 1 || num > 75) return showToast('Enter 1 - 75', true);
+    try {
+        const res = await apiFetch(`/api/admin/room/${currentAdminRoomId}/call-number`, 'POST', { number: num });
+        if (res.success) {
+            showToast(`Called number ${num}!`);
+            document.getElementById('manual-call-input').value = '';
+            loadGameStatus();
+        } else {
+            showToast(res.message || 'Call failed', true);
+        }
+    } catch(e) { showToast('Call error', true); }
+}
+
+async function changeSpeed() {
+    const sp = Number(document.getElementById('speed-select').value);
+    const isAuto = document.getElementById('auto-btn').innerText.includes('ON');
+    try {
+        await apiFetch(`/api/admin/room/${currentAdminRoomId}/auto-game`, 'POST', { isAutoOn: isAuto, speed: sp });
+        showToast(`Speed set to ${sp}s!`);
+    } catch(e) {}
+}
+
+async function toggleAuto() {
+    const isCurrentlyOn = document.getElementById('auto-btn').innerText.includes('ON');
+    const sp = Number(document.getElementById('speed-select').value);
+    try {
+        await apiFetch(`/api/admin/room/${currentAdminRoomId}/auto-game`, 'POST', { isAutoOn: !isCurrentlyOn, speed: sp });
+        loadGameStatus();
+    } catch(e) {}
+}
+
+async function toggleForceWin() {
+    const isCurrentlyOn = document.getElementById('force-win-btn').innerText.includes('ON');
+    try {
+        const res = await apiFetch(`/api/admin/room/${currentAdminRoomId}/toggle-force-win`, 'POST', { active: !isCurrentlyOn });
+        if (res.success) {
+            showToast(!isCurrentlyOn ? '⚡ Force Bot Win Enabled!' : 'Force Bot Win Disabled');
+            loadGameStatus();
+        }
+    } catch(e) {}
+}
+
+// ─── Dashboard Data ───
+async function loadDashboardData() {
+    try {
+        const d = await apiFetch('/api/admin/dashboard');
+        if (d.success && d.data) {
+            document.getElementById('stat-net-revenue').innerText = `ETB ${d.data.netBalance.toFixed(2)}`;
+            document.getElementById('stat-unique-players').innerText = d.data.totalPlayers;
+            document.getElementById('daily-dep').innerText = `ETB ${d.data.dailyDep.toFixed(2)}`;
+            document.getElementById('daily-wd').innerText = `ETB ${d.data.dailyWd.toFixed(2)}`;
+            document.getElementById('weekly-dep').innerText = `ETB ${d.data.weeklyDep.toFixed(2)}`;
+            document.getElementById('weekly-wd').innerText = `ETB ${d.data.weeklyWd.toFixed(2)}`;
+            document.getElementById('monthly-dep').innerText = `ETB ${d.data.monthlyDep.toFixed(2)}`;
+            document.getElementById('monthly-wd').innerText = `ETB ${d.data.monthlyWd.toFixed(2)}`;
+        }
+    } catch(e) {}
+
+    apiFetch('/api/admin/transactions').then(d => {
+        if (d.success) {
+            const tbody = document.getElementById('dashboard-recent-txns');
+            tbody.innerHTML = '';
+            d.data.slice(0, 6).forEach(txn => {
+                let color = txn.status === 'approved' ? 'var(--success)' : (txn.status === 'rejected' ? 'var(--danger)' : 'var(--gold)');
+                tbody.innerHTML += `<tr><td><span class="user-link" onclick="fetchAndOpenPlayer('${txn.user_id}')">${escapeHtml(txn.user_name)}</span></td><td style="text-transform:capitalize;">${txn.type}</td><td style="font-weight:bold; color:var(--gold);">${txn.amount} ETB</td><td><span style="color:${color}; font-weight:bold;">${txn.status}</span></td><td>${new Date(txn.created).toLocaleDateString()}</td></tr>`;
+            });
+        }
+    });
+}
+
+// ─── Ghost Bot Settings ───
+async function loadBotSettings() {
+    try {
+        const d = await apiFetch('/api/settings');
+        if (d.success && d.data) {
+            document.getElementById('bot-enabled').checked = d.data.botEnabled;
+            document.getElementById('bot-win-rate').value = d.data.botWinRate;
+            document.getElementById('bot-names').value = (d.data.botNames || []).join(', ');
+            if (document.getElementById('bot-count-input')) {
+                document.getElementById('bot-count-input').value = d.data.botCount || 50;
+            }
+        }
+    } catch(e) {}
+}
+
+async function saveBotSettings() {
+    const enabled = document.getElementById('bot-enabled').checked;
+    const winRate = Number(document.getElementById('bot-win-rate').value);
+    const names = document.getElementById('bot-names').value.split(',').map(s => s.trim()).filter(s => s);
+    const botCount = Number(document.getElementById('bot-count-input')?.value || 50);
+    try {
+        const res = await apiFetch('/api/admin/settings', 'POST', { botEnabled: enabled, botWinRate: winRate, botNames: names, botCount });
+        if (res.success) showToast('Bot settings saved!');
+    } catch(e) { showToast('Save failed', true); }
+}
+
+// ─── Transactions (Deposits / Withdrawals) ───
+async function loadTransactions(type) {
+    const tbody = document.getElementById(`${type}-table-body`);
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Loading...</td></tr>';
+    try {
+        const d = await apiFetch(`/api/admin/transactions?type=${type}`);
+        if (d.success) {
+            tbody.innerHTML = '';
+            if (!d.data.length) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No ${type} requests found.</td></tr>`;
+                return;
+            }
+            d.data.forEach(txn => {
+                let statusColor = txn.status === 'approved' ? 'var(--success)' : txn.status === 'rejected' ? 'var(--danger)' : 'var(--gold)';
+                let actionBtn = txn.status === 'pending' ? `
+                    <button class="btn btn-success btn-sm" onclick="actionTxn('${txn.id}', 'approve')"><i class="fas fa-check"></i> Approve</button>
+                    <button class="btn btn-danger btn-sm" onclick="actionTxn('${txn.id}', 'reject')"><i class="fas fa-times"></i> Reject</button>
+                ` : `<span style="color:${statusColor}; font-weight:bold;">${txn.status.toUpperCase()}</span>`;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><span class="user-link" onclick="fetchAndOpenPlayer('${txn.user_id}')">${escapeHtml(txn.user_name)}</span></td>
+                        <td style="font-weight:bold; color:var(--gold);">${txn.amount} ETB</td>
+                        <td><code>${txn.reference || txn.phone || '-'}</code></td>
+                        <td><span style="color:${statusColor}; font-weight:bold;">${txn.status}</span></td>
+                        <td>${actionBtn}</td>
+                    </tr>
+                `;
+            });
+        }
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--danger)">Error loading.</td></tr>'; }
+}
+
+async function actionTxn(id, act) {
+    try {
+        const res = await apiFetch(`/api/admin/transactions/${id}/${act}`, 'POST');
+        if (res.success) {
+            showToast(`Transaction ${act}d successfully!`);
+            loadTransactions(currentPage === 'deposits' ? 'deposit' : 'withdrawal');
+        } else { showToast(res.error || 'Failed', true); }
+    } catch(e) { showToast('Server error', true); }
+}
+
+// ─── Users Directory ───
+async function loadPlayers() {
+    const tbody = document.getElementById('players-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading players...</td></tr>';
+    try {
+        const d = await apiFetch('/api/admin/users');
+        if (d.success) {
+            allPlayersData = d.data;
+            renderPlayersTable(allPlayersData);
+        }
+    } catch(e) {}
+}
+
+function renderPlayersTable(users) {
+    const tbody = document.getElementById('players-table-body');
+    tbody.innerHTML = '';
+    users.slice(0, 50).forEach(u => {
+        tbody.innerHTML += `
+            <tr>
+                <td><span class="user-link" onclick="fetchAndOpenPlayer('${u.id}')">${escapeHtml(u.name || 'Player')}</span></td>
+                <td><code>${u.id}</code></td>
+                <td>${u.phone || '-'}</td>
+                <td style="color:var(--gold); font-weight:bold;">${Number(u.play_balance).toFixed(2)}</td>
+                <td style="color:var(--success); font-weight:bold;">${Number(u.win_balance).toFixed(2)}</td>
+                <td><button class="btn btn-primary btn-sm" onclick="fetchAndOpenPlayer('${u.id}')"><i class="fas fa-eye"></i> Manage</button></td>
+            </tr>
+        `;
+    });
+}
+
+function filterPlayers() {
+    const q = document.getElementById('player-search').value.toLowerCase();
+    const filtered = allPlayersData.filter(u => 
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        (u.id && u.id.includes(q)) ||
+        (u.phone && u.phone.includes(q))
+    );
+    renderPlayersTable(filtered);
+}
+
+async function fetchAndOpenPlayer(id) {
+    try {
+        const d = await apiFetch(`/api/admin/users/${id}`);
+        if (d.success && d.data) {
+            const p = d.data;
+            currentSelectedPlayer = p;
+            document.getElementById('p-name').innerText = p.name || 'Player';
+            document.getElementById('p-id').innerText = 'ID: ' + p.id;
+            document.getElementById('p-play').innerText = Number(p.play_balance).toFixed(2) + ' ETB';
+            document.getElementById('p-win').innerText = Number(p.win_balance).toFixed(2) + ' ETB';
+            document.getElementById('p-phone').innerText = p.phone || '-';
+            document.getElementById('p-games-wins').innerText = `${p.total_games || 0} / ${p.total_wins || 0}`;
+            document.getElementById('p-joined').innerText = new Date(p.registered_at).toLocaleDateString();
+            document.getElementById('adjust-play-bal').value = p.play_balance;
+            document.getElementById('adjust-win-bal').value = p.win_balance;
+
+            // Referral / Invitation Details
+            const invByEl = document.getElementById('p-invited-by');
+            if (invByEl) {
+                if (p.invitedBy) {
+                    invByEl.innerHTML = `<span class="user-link" onclick="fetchAndOpenPlayer('${p.invitedBy.id}')">${escapeHtml(p.invitedBy.name || 'User ' + p.invitedBy.id)}</span> <span style="font-size:11px; color:var(--text-muted);">(${p.invitedBy.phone || 'No phone'})</span>`;
+                } else {
+                    invByEl.innerText = 'Direct (None)';
+                }
+            }
+
+            const invCount = p.totalInvitedCount !== undefined ? p.totalInvitedCount : (p.invitedUsers ? p.invitedUsers.length : 0);
+            const countEl = document.getElementById('p-invited-count');
+            if (countEl) countEl.innerText = invCount;
+            const badgeEl = document.getElementById('p-invited-badge');
+            if (badgeEl) badgeEl.innerText = `${invCount} users`;
+
+            const listEl = document.getElementById('p-invited-list');
+            if (listEl) {
+                if (p.invitedUsers && p.invitedUsers.length > 0) {
+                    let itemsHtml = '';
+                    p.invitedUsers.forEach(iu => {
+                        itemsHtml += `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 2px; border-bottom:1px solid rgba(255,255,255,0.06);">
+                                <div>
+                                    <span class="user-link" onclick="fetchAndOpenPlayer('${iu.id}')">${escapeHtml(iu.name || 'User')}</span>
+                                    <span style="font-size:10px; color:var(--text-muted); margin-left:4px;">${iu.phone || ''}</span>
+                                </div>
+                                <span style="color:var(--gold); font-size:10px; font-weight:bold;">${Number(iu.play_balance || 0).toFixed(0)} ETB</span>
+                            </div>
+                        `;
+                    });
+                    listEl.innerHTML = itemsHtml;
+                } else {
+                    listEl.innerHTML = '<span style="color:var(--text-muted); font-size:11px;">No users invited yet.</span>';
+                }
+            }
+
+            document.getElementById('player-overlay').classList.add('active');
+            document.getElementById('player-panel').classList.add('active');
+        }
+    } catch(e) {}
+}
+
+function closePlayerPanel() {
+    document.getElementById('player-overlay').classList.remove('active');
+    document.getElementById('player-panel').classList.remove('active');
+}
+
+async function saveAdjustedBalance() {
+    if (!currentSelectedPlayer) return;
+    const play = Number(document.getElementById('adjust-play-bal').value);
+    const win = Number(document.getElementById('adjust-win-bal').value);
+    try {
+        const res = await apiFetch(`/api/admin/users/${currentSelectedPlayer.id}/balance`, 'POST', { play_balance: play, win_balance: win });
+        if (res.success) {
+            showToast('User balance updated!');
+            fetchAndOpenPlayer(currentSelectedPlayer.id);
+            loadPlayers();
+        }
+    } catch(e) { showToast('Update failed', true); }
+}
+
+async function sendDirectMessage() {
+    if (!currentSelectedPlayer) return;
+    const msg = document.getElementById('direct-msg-input').value.trim();
+    if (!msg) return;
+    try {
+        const res = await apiFetch(`/api/admin/users/${currentSelectedPlayer.id}/message`, 'POST', { message: msg });
+        if (res.success) {
+            showToast('Message sent to user via Telegram!');
+            document.getElementById('direct-msg-input').value = '';
+        } else showToast('Send failed', true);
+    } catch(e) { showToast('Error sending', true); }
+}
+
+async function deletePlayerProfile() {
+    if (!currentSelectedPlayer) return;
+    if (!confirm(`Delete player ${currentSelectedPlayer.name}? This will wipe their account and cards.`)) return;
+    try {
+        const res = await apiFetch(`/api/admin/users/${currentSelectedPlayer.id}`, 'DELETE');
+        if (res.success) {
+            showToast('Player deleted!');
+            closePlayerPanel();
+            loadPlayers();
+        }
+    } catch(e) { showToast('Delete failed', true); }
+}
+
+function mulberry32(a) { return function() { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function generateCardLayout(cn) {
+    const cols = [[], [], [], [], []]; const seedBase = cn * 100;
+    for (let c = 0; c < 5; c++) {
+        const min = c * 15 + 1, max = c * 15 + 15; const avail = [];
+        for (let n = min; n <= max; n++) avail.push(n);
+        const seed = seedBase + c; const rand = mulberry32(seed);
+        for (let i = avail.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [avail[i], avail[j]] = [avail[j], avail[i]]; }
+        cols[c] = avail.slice(0, 5);
+    }
+    cols[2][2] = 'FREE';
+    return cols;
+}
+
+async function viewPlayerCards() {
+    if (!currentSelectedPlayer) return;
+    const modalBody = document.getElementById('cards-modal-body');
+    document.getElementById('cards-modal-title').innerText = `${currentSelectedPlayer.name}'s Cards`;
+    modalBody.innerHTML = '<div style="text-align:center; width:100%; color:var(--text-muted);">Loading cards...</div>';
+    document.getElementById('cards-modal').classList.add('active');
+
+    try {
+        const d = await apiFetch(`/api/admin/user-cards/${currentSelectedPlayer.id}?roomId=${currentAdminRoomId}`);
+        if (!d.success || !d.data.userCards.length) {
+            modalBody.innerHTML = '<div style="text-align:center; width:100%; color:var(--danger);">Player has no cards in this room.</div>';
+            return;
+        }
+        let html = '';
+        d.data.userCards.forEach(cardNum => {
+            const matrix = generateCardLayout(cardNum);
+            html += `<div class="bingo-grid"><div style="text-align:center; color:var(--gold); margin-bottom:6px; font-weight:bold;">CARD #${cardNum}</div><div class="grid-letters"><div style="background:#3b82f6;">B</div><div style="background:#ef4444;">I</div><div style="background:#10b981;">N</div><div style="background:#f59e0b;">G</div><div style="background:#8b5cf6;">O</div></div><div class="grid-cells">`;
+            for(let r=0; r<5; r++) {
+                for(let c=0; c<5; c++) {
+                    let val = matrix[c][r];
+                    let isCalled = d.data.calledNumbers.includes(val);
+                    html += `<div class="grid-cell ${val==='FREE'?'free':(isCalled?'marked':'')}">${val}</div>`;
+                }
+            }
+            html += `</div></div>`;
+        });
+        modalBody.innerHTML = html;
+    } catch(e) { modalBody.innerHTML = 'Error loading cards.'; }
+}
+
+// ─── Promo Codes ───
+async function loadPromoCodes() {
+    const tbody = document.getElementById('promo-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
+    try {
+        const d = await apiFetch('/api/admin/promo-codes');
+        if (d.success) {
+            tbody.innerHTML = '';
+            d.data.forEach(p => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${p.code}</b></td>
+                        <td style="color:var(--gold); font-weight:bold;">${p.amount} ETB</td>
+                        <td>${p.usedCount} / ${p.maxUses}</td>
+                        <td>${new Date(p.expiresAt).toLocaleDateString()}</td>
+                        <td><span style="color:var(--success); font-weight:bold;">${p.status}</span></td>
+                        <td><button class="btn btn-danger btn-sm" onclick="deletePromoCode('${p._id}')"><i class="fas fa-trash"></i></button></td>
+                    </tr>
+                `;
+            });
+        }
+    } catch(e) {}
+}
+
+async function createPromoCode() {
+    const code = document.getElementById('promo-code').value.trim();
+    const amount = Number(document.getElementById('promo-amount').value);
+    const maxUses = Number(document.getElementById('promo-max-uses').value);
+    const duration = Number(document.getElementById('promo-duration').value);
+    if (!code || !amount) return showToast('Fill all fields', true);
+    try {
+        const res = await apiFetch('/api/admin/promo-codes', 'POST', { code, amount, maxUses, durationMinutes: duration });
+        if (res.success) {
+            showToast('Promo code created!');
+            document.getElementById('promo-code').value = '';
+            loadPromoCodes();
+        }
+    } catch(e) { showToast('Creation failed', true); }
+}
+
+async function deletePromoCode(id) {
+    if (!confirm('Delete promo code?')) return;
+    try {
+        const res = await apiFetch(`/api/admin/promo-codes/${id}`, 'DELETE');
+        if (res.success) { showToast('Deleted!'); loadPromoCodes(); }
+    } catch(e) {}
+}
+
+// ─── Broadcast CRUD ───
+async function loadBroadcasts() {
+    const tbody = document.getElementById('broadcast-table-body');
+    try {
+        const d = await apiFetch('/api/admin/broadcasts');
+        if (d.success) {
+            tbody.innerHTML = '';
+            if (!d.data || !d.data.length) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:15px;">No broadcasts found.</td></tr>';
+                return;
+            }
+            d.data.forEach(b => {
+                const bId = b.id || b._id;
+                const sentCount = b.sentMessages ? b.sentMessages.length : 0;
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${new Date(b.sentAt).toLocaleString()}</td>
+                        <td style="max-width:320px; word-break:break-word;">${escapeHtml(b.message)}</td>
+                        <td><span class="badge" style="background:rgba(59,130,246,0.15); color:var(--blue); padding:3px 8px; border-radius:10px; font-weight:bold;">${sentCount} players</span></td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" onclick="editBroadcastPrompt('${bId}', '${encodeURIComponent(b.message)}')"><i class="fas fa-edit"></i> Edit</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteBroadcast('${bId}')"><i class="fas fa-trash"></i> Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch(e) {}
+}
+
+async function sendBroadcast() {
+    const msg = document.getElementById('broadcast-msg').value.trim();
+    if (!msg) return showToast('Enter message', true);
+    try {
+        const res = await apiFetch('/api/admin/broadcast', 'POST', { message: msg });
+        if (res.success) {
+            showToast(`Broadcast sent to ${res.count} players!`);
+            document.getElementById('broadcast-msg').value = '';
+            loadBroadcasts();
+        }
+    } catch(e) { showToast('Send failed', true); }
+}
+
+async function editBroadcastPrompt(id, encodedCurrentMsg) {
+    const currentMsg = decodeURIComponent(encodedCurrentMsg);
+    const newMsg = prompt("Edit broadcast message (will update in real time on all users' Telegram):", currentMsg);
+    if (!newMsg || !newMsg.trim() || newMsg.trim() === currentMsg) return;
+    try {
+        const res = await apiFetch(`/api/admin/broadcasts/${id}`, 'PUT', { message: newMsg.trim() });
+        if (res.success) {
+            showToast(`Broadcast updated across all Telegram chats! (${res.updatedCount || 0} modified)`);
+            loadBroadcasts();
+        } else {
+            showToast(res.error || 'Edit failed', true);
+        }
+    } catch(e) { showToast('Server error', true); }
+}
+
+async function deleteBroadcast(id) {
+    if (!confirm('Are you sure you want to delete this broadcast? This will remove the message from all users\' Telegram chats!')) return;
+    try {
+        const res = await apiFetch(`/api/admin/broadcasts/${id}`, 'DELETE');
+        if (res.success) {
+            showToast('Broadcast deleted from all Telegram chats!');
+            loadBroadcasts();
+        } else {
+            showToast('Delete failed', true);
+        }
+    } catch(e) { showToast('Server error', true); }
+}
+
+// ─── Giveaway CRUD ───
+async function loadGiveaways() {
+    const tbody = document.getElementById('giveaway-table-body');
+    try {
+        const d = await apiFetch('/api/admin/giveaways');
+        if (d.success) {
+            tbody.innerHTML = '';
+            if (!d.data || !d.data.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:15px;">No giveaways found.</td></tr>';
+                return;
+            }
+            d.data.forEach(g => {
+                const gId = g.id || g._id;
+                const statusColor = g.status === 'active' ? 'var(--success)' : 'var(--text-muted)';
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${new Date(g.createdAt).toLocaleDateString()}</td>
+                        <td style="color:var(--gold); font-weight:bold;">${g.amount} ETB</td>
+                        <td>${g.totalUsers}</td>
+                        <td><b>${(g.claimedBy || []).length}</b> / ${g.totalUsers}</td>
+                        <td><span style="color:${statusColor}; font-weight:bold; text-transform:uppercase;">${g.status}</span></td>
+                        <td>
+                            ${g.status === 'active' ? `<button class="btn btn-warning btn-sm" onclick="closeGiveaway('${gId}')"><i class="fas fa-ban"></i> Close</button>` : ''}
+                            <button class="btn btn-danger btn-sm" onclick="deleteGiveaway('${gId}')"><i class="fas fa-trash"></i> Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    } catch(e) {}
+}
+
+async function createGiveaway() {
+    const amt = Number(document.getElementById('giveaway-amount').value);
+    const users = Number(document.getElementById('giveaway-total-users').value);
+    const duration = Number(document.getElementById('giveaway-duration').value);
+    if (!amt || !users) return showToast('Fill all fields', true);
+    try {
+        const res = await apiFetch('/api/admin/giveaway', 'POST', { amount: amt, totalUsers: users, durationMinutes: duration });
+        if (res.success) {
+            showToast(`Giveaway created & sent to ${res.count || 0} players!`);
+            loadGiveaways();
+        }
+    } catch(e) { showToast('Failed', true); }
+}
+
+async function closeGiveaway(id) {
+    if (!confirm('Close this giveaway campaign? Users will no longer be able to claim bonuses.')) return;
+    try {
+        const res = await apiFetch(`/api/admin/giveaways/${id}`, 'PUT', { status: 'closed' });
+        if (res.success) {
+            showToast('Giveaway closed and updated on Telegram!');
+            loadGiveaways();
+        }
+    } catch(e) { showToast('Error closing giveaway', true); }
+}
+
+async function deleteGiveaway(id) {
+    if (!confirm('Delete giveaway? This will delete the claim message from all users\' Telegram chats.')) return;
+    try {
+        const res = await apiFetch(`/api/admin/giveaways/${id}`, 'DELETE');
+        if (res.success) {
+            showToast('Giveaway cleared from all Telegram chats and database!');
+            loadGiveaways();
+        }
+    } catch(e) { showToast('Delete failed', true); }
+}
+
+// ─── Referrals & History ───
+async function loadReferrals() {
+    const tbody = document.getElementById('referral-table-body');
+    try {
+        const d = await apiFetch('/api/admin/referrals');
+        if (d.success) {
+            tbody.innerHTML = '';
+            const inviterMap = new Map();
+            d.data.forEach(r => {
+                if (!inviterMap.has(r.referrer_id)) inviterMap.set(r.referrer_id, { name: r.referrer_name, count: 0, bonus: 0 });
+                const item = inviterMap.get(r.referrer_id);
+                item.count++;
+                item.bonus += 30;
+            });
+            let rank = 1;
+            Array.from(inviterMap.values()).sort((a,b) => b.count - a.count).forEach(item => {
+                tbody.innerHTML += `<tr><td>#${rank++}</td><td><b>${escapeHtml(item.name)}</b></td><td>${item.count}</td><td style="color:var(--gold); font-weight:bold;">${item.bonus} ETB</td></tr>`;
+            });
+        }
+    } catch(e) {}
+}
+
+async function loadGameHistory() {
+    const tbody = document.getElementById('history-table-body');
+    try {
+        const d = await apiFetch('/api/admin/game-history');
+        if (d.success) {
+            tbody.innerHTML = '';
+            if (!d.data || !d.data.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:15px;">No game history logs.</td></tr>';
+                return;
+            }
+            d.data.forEach(h => {
+                let winnersStr = (h.winners || []).map(w => `${w.name} #${w.cardNum}`).join(', ');
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${new Date(h.createdAt).toLocaleTimeString()}</td>
+                        <td><b>${h.roomId || 'classic_10'}</b></td>
+                        <td>${escapeHtml(winnersStr || 'None')}</td>
+                        <td style="color:var(--success); font-weight:bold;">${h.totalPrize} ETB</td>
+                        <td>${h.totalPlayers}</td>
+                        <td><button class="btn btn-danger btn-sm" onclick="deleteSingleHistory('${h._id}')"><i class="fas fa-trash"></i></button></td>
+                    </tr>
+                `;
+            });
+        }
+    } catch(e) {}
+}
+
+async function deleteSingleHistory(id) {
+    if (!confirm('Delete this history record?')) return;
+    try {
+        const res = await apiFetch(`/api/admin/game-history/${id}`, 'DELETE');
+        if (res.success) {
+            showToast('History record deleted');
+            loadGameHistory();
+        }
+    } catch(e) { showToast('Error deleting record', true); }
+}
+
+async function clearAllGameHistory() {
+    if (!confirm('⚠️ Are you sure you want to permanently clear ALL game history logs? This action cannot be undone!')) return;
+    try {
+        const res = await apiFetch('/api/admin/game-history/all', 'DELETE');
+        if (res.success) {
+            showToast('All game history cleared!');
+            loadGameHistory();
+        }
+    } catch(e) { showToast('Clear failed', true); }
+}
+
+// ─── Global Settings ───
+async function loadGlobalSettings() {
+    try {
+        const d = await apiFetch('/api/settings');
+        if (d.success && d.data) {
+            const supEl = document.getElementById('set-support-username');
+            if (supEl) supEl.value = d.data.support_username || '@Tazikes';
+            document.getElementById('set-telebirr').value = d.data.telebirr_number || '';
+            document.getElementById('set-telebirr-name').value = d.data.telebirr_name || '';
+            const cdEl = document.getElementById('set-countdown-time');
+            if (cdEl) cdEl.value = d.data.countdownTime || 40;
+            document.getElementById('enable-double-deposit').checked = !!d.data.doubleDepositActive;
+        }
+    } catch(e) {}
+}
+
+async function saveGlobalSettings() {
+    const tele = document.getElementById('set-telebirr').value.trim();
+    const name = document.getElementById('set-telebirr-name').value.trim();
+    const dd = document.getElementById('enable-double-deposit').checked;
+    const supEl = document.getElementById('set-support-username');
+    const supportUser = supEl ? supEl.value.trim() : '@Tazikes';
+    const cdEl = document.getElementById('set-countdown-time');
+    const cdTime = cdEl ? parseInt(cdEl.value) || 40 : 40;
+    try {
+        const res = await apiFetch('/api/admin/settings', 'POST', {
+            telebirr_number: tele,
+            telebirr_name: name,
+            doubleDepositActive: dd,
+            support_username: supportUser,
+            countdownTime: cdTime
+        });
+        if (res.success) showToast('Settings saved & broadcast to all users!');
+    } catch(e) { showToast('Save failed', true); }
+}
+
+function setRoomCountdownPreset(sec) {
+    const inp = document.getElementById('adm-countdown-input');
+    if (inp) inp.value = sec;
+    saveRoomCountdown();
+}
+
+async function saveRoomCountdown() {
+    const inp = document.getElementById('adm-countdown-input');
+    const sec = parseInt(inp ? inp.value : 40) || 40;
+    try {
+        const res = await apiFetch(`/api/admin/room/${currentAdminRoomId}/countdown-time`, 'POST', { countdownTime: sec });
+        if (res.success) {
+            showToast(`Cartela selection countdown set to ${res.countdownTime}s`);
+            loadGameStatus();
+        }
+    } catch(e) { showToast('Error saving countdown', true); }
+}
+
+// ─── Invitation Bonus Settings ───
+async function loadInvitationBonusSettings() {
+    try {
+        const d = await apiFetch('/api/settings');
+        if (d.success && d.data) {
+            const en = d.data.referral_enabled !== false;
+            const refBonus = d.data.referral_bonus_referrer !== undefined ? d.data.referral_bonus_referrer : 30;
+            const newBonus = d.data.referral_bonus_referee !== undefined ? d.data.referral_bonus_referee : 20;
+
+            const chk = document.getElementById('ref-enabled');
+            if (chk) chk.checked = en;
+            const refInp = document.getElementById('ref-referrer-bonus');
+            if (refInp) refInp.value = refBonus;
+            const newInp = document.getElementById('ref-referee-bonus');
+            if (newInp) newInp.value = newBonus;
+        }
+    } catch(e) {}
+}
+
+function setRefPreset(type, val) {
+    if (type === 'referrer') {
+        const el = document.getElementById('ref-referrer-bonus');
+        if (el) el.value = val;
+    } else if (type === 'referee') {
+        const el = document.getElementById('ref-referee-bonus');
+        if (el) el.value = val;
+    }
+}
+
+async function saveInvitationBonusSettings() {
+    const enabled = document.getElementById('ref-enabled').checked;
+    const refBonus = Number(document.getElementById('ref-referrer-bonus').value);
+    const newBonus = Number(document.getElementById('ref-referee-bonus').value);
+
+    if (isNaN(refBonus) || refBonus < 0) return showToast('Invalid referrer bonus amount', true);
+    if (isNaN(newBonus) || newBonus < 0) return showToast('Invalid referee bonus amount', true);
+
+    try {
+        const res = await apiFetch('/api/admin/settings', 'POST', {
+            referral_enabled: enabled,
+            referral_bonus_referrer: refBonus,
+            referral_bonus_referee: newBonus
+        });
+        if (res.success) {
+            showToast(`🎉 Invitation Bonus saved & broadcast! (Referrer: ${refBonus} ETB, Referee: ${newBonus} ETB)`);
+        } else {
+            showToast(res.message || 'Failed to save referral settings', true);
+        }
+    } catch(e) {
+        showToast('Error saving referral settings', true);
+    }
+}
+
+// ─── Deposit Bonus Settings ───
+let depBonusCountdownInterval = null;
+
+async function loadDepositBonusSettings() {
+    try {
+        const d = await apiFetch('/api/settings');
+        if (d.success && d.data) {
+            const s = d.data;
+            const enabled = !!s.deposit_bonus_enabled;
+            const pct = s.deposit_bonus_percent !== undefined ? s.deposit_bonus_percent : 50;
+            const dur = s.deposit_bonus_duration_hours !== undefined ? s.deposit_bonus_duration_hours : 24;
+
+            const chk = document.getElementById('adm-dep-bonus-enabled');
+            if (chk) chk.checked = enabled;
+            const pctEl = document.getElementById('adm-dep-bonus-percent');
+            if (pctEl) pctEl.value = pct;
+            const durEl = document.getElementById('adm-dep-bonus-duration');
+            if (durEl) durEl.value = dur;
+
+            updateAdminDepBonusBanner(s);
+        }
+    } catch(e) {}
+}
+
+function updateAdminDepBonusBanner(s) {
+    if (depBonusCountdownInterval) clearInterval(depBonusCountdownInterval);
+    const textEl = document.getElementById('adm-dep-bonus-status-text');
+    const expiryEl = document.getElementById('adm-dep-bonus-expiry-text');
+    const badgeEl = document.getElementById('adm-dep-bonus-badge');
+    const bannerEl = document.getElementById('adm-dep-bonus-status-banner');
+    if (!textEl) return;
+
+    const enabled = !!s?.deposit_bonus_enabled;
+    const expiresAt = s?.deposit_bonus_expires_at ? new Date(s.deposit_bonus_expires_at) : null;
+    const now = new Date();
+
+    const isLive = enabled && (!expiresAt || expiresAt > now) && (Number(s?.deposit_bonus_percent) > 0);
+
+    if (isLive) {
+        if (bannerEl) { bannerEl.style.borderColor = '#10b981'; bannerEl.style.background = 'rgba(16,185,129,0.1)'; }
+        textEl.style.color = '#10b981';
+        textEl.innerText = `🟢 ACTIVE: +${s.deposit_bonus_percent}% Bonus`;
+        if (badgeEl) { badgeEl.style.background = 'rgba(16,185,129,0.2)'; badgeEl.style.color = '#10b981'; badgeEl.innerText = 'ACTIVE'; }
+
+        const updateTicker = () => {
+            if (!expiresAt) {
+                if (expiryEl) expiryEl.innerText = 'No expiration (Indefinite)';
+                return;
+            }
+            const diff = expiresAt.getTime() - Date.now();
+            if (diff <= 0) {
+                clearInterval(depBonusCountdownInterval);
+                textEl.innerText = '⚪ Expired';
+                textEl.style.color = '#ef4444';
+                if (badgeEl) { badgeEl.innerText = 'EXPIRED'; badgeEl.style.background = 'rgba(239,68,68,0.2)'; badgeEl.style.color = '#ef4444'; }
+                if (expiryEl) expiryEl.innerText = 'Promotion window has ended.';
+                return;
+            }
+            const hrs = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            if (expiryEl) expiryEl.innerText = `Expires in: ${hrs}h ${mins}m ${secs}s (${expiresAt.toLocaleString()})`;
+        };
+        updateTicker();
+        depBonusCountdownInterval = setInterval(updateTicker, 1000);
+    } else {
+        if (bannerEl) { bannerEl.style.borderColor = 'var(--border)'; bannerEl.style.background = 'rgba(0,0,0,0.3)'; }
+        textEl.style.color = '#ef4444';
+        textEl.innerText = '⚪ Inactive / Disabled';
+        if (badgeEl) { badgeEl.style.background = 'rgba(239,68,68,0.2)'; badgeEl.style.color = '#ef4444'; badgeEl.innerText = 'OFF'; }
+        if (expiryEl) expiryEl.innerText = 'No active time window';
+    }
+}
+
+function setDepBonusPercentPreset(pct) {
+    const el = document.getElementById('adm-dep-bonus-percent');
+    if (el) el.value = pct;
+}
+
+function setDepBonusDurationPreset(hrs) {
+    const el = document.getElementById('adm-dep-bonus-duration');
+    if (el) el.value = hrs;
+}
+
+async function saveDepositBonusSettings(activate) {
+    const enabled = activate !== undefined ? activate : document.getElementById('adm-dep-bonus-enabled').checked;
+    const pct = Number(document.getElementById('adm-dep-bonus-percent').value);
+    const duration = Number(document.getElementById('adm-dep-bonus-duration').value);
+
+    if (enabled && (isNaN(pct) || pct <= 0)) return showToast('Enter valid bonus percentage (> 0)', true);
+    if (enabled && (isNaN(duration) || duration <= 0)) return showToast('Enter valid duration hours (> 0)', true);
+
+    try {
+        const payload = {
+            deposit_bonus_enabled: enabled,
+            deposit_bonus_percent: pct,
+            deposit_bonus_duration_hours: duration
+        };
+        const res = await apiFetch('/api/admin/settings', 'POST', payload);
+        if (res.success) {
+            showToast(enabled ? `🎉 +${pct}% Deposit Bonus activated for ${duration}h!` : 'Deposit bonus deactivated');
+            document.getElementById('adm-dep-bonus-enabled').checked = enabled;
+            loadDepositBonusSettings();
+        } else {
+            showToast(res.message || 'Failed to save', true);
+        }
+    } catch(e) {
+        showToast('Error saving deposit bonus', true);
+    }
+}
+
+// ─── Real-Time Notifications & Web Push ───
+let adminSocket = null;
+
+function initAdminRealtime() {
+    if (typeof io === 'undefined') return;
+    try {
+        const socketUrl = (typeof BACKEND_URL !== 'undefined' ? BACKEND_URL : window.location.origin);
+        adminSocket = io(socketUrl, { transports: ['websocket', 'polling'] });
+        adminSocket.on('connect', () => {
+            if (AUTH_TOKEN) {
+                adminSocket.emit('admin_join', { auth: AUTH_TOKEN });
+            }
+        });
+        adminSocket.on('admin_new_transaction', (txn) => {
+            playTransactionChime();
+            showPushNotification(txn.type, txn.amount, txn.userName);
+            if (txn.type === 'deposit') {
+                const el = document.getElementById('notif-deposits');
+                if (el) {
+                    const c = (parseInt(el.innerText) || 0) + 1;
+                    el.innerText = c;
+                    el.classList.remove('hidden');
+                }
+                if (currentPage === 'deposits') loadTransactions('deposit');
+            } else if (txn.type === 'withdrawal') {
+                const el = document.getElementById('notif-withdrawals');
+                if (el) {
+                    const c = (parseInt(el.innerText) || 0) + 1;
+                    el.innerText = c;
+                    el.classList.remove('hidden');
+                }
+                if (currentPage === 'withdrawals') loadTransactions('withdrawal');
+            }
+            if (currentPage === 'dashboard') loadDashboardData();
+        });
+
+        // Real-Time Game Events Syncing directly from server
+        adminSocket.on('timer_tick', (data) => {
+            const timerEl = document.getElementById('adm-countdown-timer');
+            if (timerEl && (!data?.roomId || data.roomId === currentAdminRoomId)) {
+                timerEl.innerText = `${data.remaining}s`;
+                timerEl.style.color = 'var(--cyan)';
+            }
+        });
+
+        adminSocket.on('new_number_called', (data) => {
+            if ((currentPage === 'game' || currentPage === 'live-players' || currentPage === 'live-cartelas') && (!data?.roomId || data.roomId === currentAdminRoomId)) {
+                const num = data.number;
+                const prefix = num <= 15 ? 'B' : num <= 30 ? 'I' : num <= 45 ? 'N' : num <= 60 ? 'G' : 'O';
+                const count = data.allCalled ? data.allCalled.length : (data.callCount || 0);
+                const el = document.getElementById('adm-calls-display');
+                if (el) el.innerText = `${count} / ${prefix}-${num}`;
+                loadGameStatus();
+            }
+        });
+
+        adminSocket.on('reset_game', (data) => {
+            if ((currentPage === 'game' || currentPage === 'live-players' || currentPage === 'live-cartelas') && (!data?.roomId || data.roomId === currentAdminRoomId)) {
+                const el = document.getElementById('adm-calls-display');
+                if (el) el.innerText = '0 / --';
+                const timerEl = document.getElementById('adm-countdown-timer');
+                if (timerEl) { timerEl.innerText = 'Waiting'; timerEl.style.color = 'var(--text-muted)'; }
+                loadGameStatus();
+            }
+        });
+
+        ['sync_taken_cards', 'phase_change', 'game_over'].forEach(ev => {
+            adminSocket.on(ev, (data) => {
+                if ((currentPage === 'game' || currentPage === 'live-players' || currentPage === 'live-cartelas') && (!data?.roomId || data.roomId === currentAdminRoomId)) {
+                    loadGameStatus();
+                }
+            });
+        });
+    } catch(e) {
+        console.warn('Admin realtime socket skipped:', e);
+    }
+}
+
+function playTransactionChime() {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+        osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+        osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        osc.start(now);
+        osc.stop(now + 0.6);
+    } catch(e) {}
+}
+
+function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+function startNotificationPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    checkNotifications();
+    pollInterval = setInterval(checkNotifications, 10000);
+    initAdminRealtime();
+    requestNotificationPermission();
+}
+
+async function checkNotifications() {
+    if (!AUTH_TOKEN) return;
+    try {
+        const d = await apiFetch('/api/admin/dashboard');
+        if (d.success && d.data) {
+            updateNotifBadge('notif-deposits', d.data.pendingDeposits);
+            updateNotifBadge('notif-withdrawals', d.data.pendingWithdrawals);
+
+            if (d.data.pendingDeposits > lastPendingDeposits && lastPendingDeposits > 0) {
+                showPushNotification('deposit', d.data.pendingDepositAmount);
+                playTransactionChime();
+            }
+            if (d.data.pendingWithdrawals > lastPendingWithdrawals && lastPendingWithdrawals > 0) {
+                showPushNotification('withdrawal', d.data.pendingWithdrawalAmount);
+                playTransactionChime();
+            }
+            lastPendingDeposits = d.data.pendingDeposits;
+            lastPendingWithdrawals = d.data.pendingWithdrawals;
+        }
+    } catch(e) {}
+}
+
+function updateNotifBadge(id, count) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (count > 0) { el.innerText = count; el.classList.remove('hidden'); }
+    else el.classList.add('hidden');
+}
+
+function showPushNotification(type, amount, userName) {
+    const c = document.getElementById('push-notification-container');
+    if (!c) return;
+    const n = document.createElement('div');
+    n.className = 'push-notification show';
+    n.innerHTML = `
+        <div class="push-icon">${type === 'deposit' ? '💰' : '💸'}</div>
+        <div class="push-content">
+            <div class="push-title">🔔 New ${type === 'deposit' ? 'Deposit' : 'Withdrawal'} Request!</div>
+            <div class="push-desc">${escapeHtml(userName || 'Player')} - ${Number(amount).toFixed(2)} ETB</div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-left:auto; padding:5px 10px;">View</button>
+    `;
+    n.onclick = () => { switchPage(type === 'deposit' ? 'deposits' : 'withdrawals'); n.remove(); };
+    c.appendChild(n);
+    setTimeout(() => { if (n.parentNode) n.remove(); }, 8000);
+
+    // Browser Push Notification (when tab is backgrounded)
+    if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+        try {
+            new Notification(`🔔 New ${type === 'deposit' ? 'Deposit' : 'Withdrawal'} (${Number(amount).toFixed(2)} ETB)`, {
+                body: `${userName || 'Player'} submitted a ${type} request. Click to review.`,
+                icon: 'https://cdn-icons-png.flaticon.com/512/2953/2953363.png'
+            });
+        } catch(e) {}
+    }
+}
+
+// Init
+window.addEventListener('load', () => {
+    if (AUTH_TOKEN) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-content').style.display = 'flex';
+        switchPage('game', document.querySelector('.menu-item'));
+        startNotificationPolling();
+    }
+});
+</script>
+</body>
+</html>
